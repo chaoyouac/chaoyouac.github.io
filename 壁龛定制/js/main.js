@@ -159,14 +159,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const url = `https://chaoyouac.github.io/壁龛定制/viewer.html?${p.toString()}`;
 
         els.qrcode.innerHTML = '';
-        new QRCode(els.qrcode, {
-            text: url,
-            width: 128,
-            height: 128,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.M
-        });
+        try {
+            new QRCode(els.qrcode, {
+                text: url,
+                width: 128,
+                height: 128,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+            console.log('QRCode generated successfully');
+        } catch (e) {
+            console.error('QRCode generation failed:', e);
+            els.qrcode.innerHTML = '<p style="color:#e74c3c;font-size:13px">二维码生成失败，请刷新重试</p>';
+        }
     }
 
     function exportViews() {
