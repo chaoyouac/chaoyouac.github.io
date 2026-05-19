@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>地漏3D视图</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -22,26 +25,6 @@ canvas{display:block;width:100vw;height:100vh}
 <div class="hint">单指拖拽旋转 · 双指缩放</div>
 <div class="info" id="info"></div>
 <script>
-function decodeFromBase64(base64){
-  var chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-  var decoded=[];
-  var i=0;
-  base64=base64.replace(/[^A-Za-z0-9\+\/\=]/g,'');
-  while(i<base64.length){
-    var c1=chars.indexOf(base64.charAt(i++));
-    var c2=chars.indexOf(base64.charAt(i++));
-    var c3=chars.indexOf(base64.charAt(i++));
-    var c4=chars.indexOf(base64.charAt(i++));
-    var b1=(c1<<2)|(c2>>4);
-    var b2=((c2&15)<<4)|(c3>>2);
-    var b3=((c3&3)<<6)|c4;
-    decoded.push(b1);
-    if(c3!==64)decoded.push(b2);
-    if(c4!==64)decoded.push(b3);
-  }
-  return decoded;
-}
-
 function getData(){
   try{
     var hash=location.hash.slice(1);
@@ -49,9 +32,9 @@ function getData(){
     if(!hash)return null;
     var decodedHash=decodeURIComponent(hash);
     console.log('Decoded hash:',decodedHash);
-    var byteArray=decodeFromBase64(decodedHash);
-    console.log('Byte array length:',byteArray.length);
-    var json=new TextDecoder('utf-8').decode(new Uint8Array(byteArray));
+    var base64Decoded=atob(decodedHash);
+    console.log('Base64 decoded:',base64Decoded);
+    var json=decodeURIComponent(escape(base64Decoded));
     console.log('Parsed JSON:',json);
     var result=JSON.parse(json);
     console.log('Final data:',result);
