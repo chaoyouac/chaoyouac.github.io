@@ -179,12 +179,7 @@ const Drawer = (function() {
         const innerX = startX;
         const innerY = startY + topFold * scale;
 
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(innerX, innerY, innerW, innerH);
-
         // 层板（带厚度）
-        ctx.lineWidth = 1.5;
         let currentY = innerY;
         for (let i = 0; i < layers - 1; i++) {
             currentY += layerHeights[i] * scale;
@@ -192,31 +187,44 @@ const Drawer = (function() {
             ctx.fillStyle = '#e0e0e0';
             ctx.fillRect(innerX, shelfY, innerW, layerThickness * scale);
             ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.5;
             ctx.strokeRect(innerX, shelfY, innerW, layerThickness * scale);
         }
 
-        // 外框折边延伸（右侧，只画线条，不画填充矩形）
+        // 内框线
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(innerX, innerY, innerW, innerH);
+
+        // 外框折边（右侧 5mm 延伸区）—— 用浅灰填充 + 黑边框，突出"翻边"效果
         const extW = extension * scale;
         const extX = innerX + innerW + extW;
 
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#000000';
+        if (extension > 0) {
+            ctx.fillStyle = '#d0d0d0';
+            ctx.fillRect(innerX + innerW, startY, extW, drawH);
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(innerX + innerW, startY, extW, drawH);
+        }
 
-        // 右侧竖线（外框折边，高 = outerH）
+        // 外框左侧线（高 = outerH，与内框左边缘重合但上下延伸）
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.moveTo(extX, startY);
-        ctx.lineTo(extX, startY + drawH);
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(startX, startY + drawH);
         ctx.stroke();
 
-        // 顶部短横线（连接内框右上角与外框右上角）
+        // 外框顶部线（从左到右 = depth）
         ctx.beginPath();
-        ctx.moveTo(innerX + innerW, startY);
+        ctx.moveTo(startX, startY);
         ctx.lineTo(extX, startY);
         ctx.stroke();
 
-        // 底部短横线（连接内框右下角与外框右下角）
+        // 外框底部线（从左到右 = depth）
         ctx.beginPath();
-        ctx.moveTo(innerX + innerW, startY + drawH);
+        ctx.moveTo(startX, startY + drawH);
         ctx.lineTo(extX, startY + drawH);
         ctx.stroke();
 
@@ -243,7 +251,7 @@ const Drawer = (function() {
 
         // 尺寸标注
         // 外高（左侧，从外框顶部到外框底部）
-        drawDimension(ctx, innerX, startY, innerX, startY + drawH, outerH.toString(), 42, 'left');
+        drawDimension(ctx, startX, startY, startX, startY + drawH, outerH.toString(), 42, 'left');
         // 内高（右侧，以内框右边缘为基准）
         drawDimension(ctx, innerX + innerW, innerY, innerX + innerW, innerY + innerH, totalHeight.toString(), 22, 'right');
         // 深度（中间横向，从内框左边缘到内框右边缘 = innerDepth）
