@@ -25,20 +25,74 @@ canvas{display:block;width:100vw;height:100vh}
 <div class="hint">单指拖拽旋转 · 双指缩放</div>
 <div class="info" id="info"></div>
 <script>
+function parseArrayData(arr){
+  if(!arr||!Array.isArray(arr)||arr.length<5)return null;
+  var type=arr[0];
+  var data={t:type};
+  var idx=1;
+  if(type===0){
+    data.l=arr[idx++];
+    data.w=arr[idx++];
+    data.h=arr[idx++];
+    data.tk=arr[idx++];
+    while(idx<arr.length){
+      var marker=arr[idx++];
+      if(marker===1){
+        data.sg=[];
+        while(idx<arr.length&&arr[idx]!==2&&arr[idx]!==3){
+          data.sg.push(arr[idx++]);
+        }
+      }else if(marker===2){
+        data.hs=[];
+        while(idx+3<arr.length&&arr[idx]!==1&&arr[idx]!==3){
+          data.hs.push({x:arr[idx++],z:arr[idx++],tp:arr[idx++],d:arr[idx++]});
+        }
+      }else{
+        break;
+      }
+    }
+  }else if(type===1){
+    data.ll=arr[idx++];
+    data.lw=arr[idx++];
+    data.sl=arr[idx++];
+    data.sw=arr[idx++];
+    data.h=arr[idx++];
+    data.p=arr[idx++];
+    while(idx<arr.length){
+      var marker=arr[idx++];
+      if(marker===2){
+        data.hs=[];
+        while(idx+3<arr.length&&arr[idx]!==3){
+          data.hs.push({x:arr[idx++],z:arr[idx++],tp:arr[idx++],d:arr[idx++]});
+        }
+      }else if(marker===3){
+        data.sh=[];
+        while(idx+3<arr.length){
+          data.sh.push({x:arr[idx++],z:arr[idx++],tp:arr[idx++],d:arr[idx++]});
+        }
+      }else{
+        break;
+      }
+    }
+  }else if(type===2){
+    data.l=arr[idx++];
+    data.w=arr[idx++];
+    data.h=arr[idx++];
+    data.tk=arr[idx++];
+  }
+  return data;
+}
+
 function getData(){
   try{
     var hash=location.hash.slice(1);
-    console.log('Raw hash:',hash);
     if(!hash)return null;
     var decodedHash=decodeURIComponent(hash);
-    console.log('Decoded hash:',decodedHash);
     var base64Decoded=atob(decodedHash);
-    console.log('Base64 decoded:',base64Decoded);
     var json=decodeURIComponent(escape(base64Decoded));
-    console.log('Parsed JSON:',json);
-    var result=JSON.parse(json);
-    console.log('Final data:',result);
-    return result;
+    var arr=JSON.parse(json);
+    if(!Array.isArray(arr))return null;
+    return parseArrayData(arr);
   }catch(e){
     console.log('Data parse error:',e);
     return null;
@@ -88,9 +142,9 @@ function drawFace(pts,fillColor,strokeColor,lw,dashed){
 function drawHoleFill(projectFn,holesData){
   ctx.save();ctx.globalCompositeOperation='destination-out';
   holesData.forEach(function(hole){
-    var holeType=hole.tp||hole.type;
-    var holeDiameter=hole.d||hole.diameter;
-    if(holeType==='slot'){
+    var holeType=hole.tp;
+    var holeDiameter=hole.d;
+    if(holeType===1){
       var sl=45,sw=23;
       var p1=projectFn(hole.x-sl/2,0,hole.z-sw/2),p2=projectFn(hole.x+sl/2,0,hole.z-sw/2);
       var p3=projectFn(hole.x+sl/2,0,hole.z+sw/2),p4=projectFn(hole.x-sl/2,0,hole.z+sw/2);
@@ -108,9 +162,9 @@ function drawHoleStroke(projectFn,holesData,offset){
   var holeColors=['#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22'];
   holesData.forEach(function(hole,idx){
     var hc=holeColors[(idx+offset)%holeColors.length];
-    var holeType=hole.tp||hole.type;
-    var holeDiameter=hole.d||hole.diameter;
-    if(holeType==='slot'){
+    var holeType=hole.tp;
+    var holeDiameter=hole.d;
+    if(holeType===1){
       var sl=45,sw=23;
       var p1=projectFn(hole.x-sl/2,0,hole.z-sw/2),p2=projectFn(hole.x+sl/2,0,hole.z-sw/2);
       var p3=projectFn(hole.x+sl/2,0,hole.z+sw/2),p4=projectFn(hole.x-sl/2,0,hole.z+sw/2);
@@ -135,10 +189,10 @@ function draw(){
   if(!data)return;
   var w=window.innerWidth,h=window.innerHeight;
   ctx.clearRect(0,0,w,h);
-  var viewType=data.t||data.type;
-  if(viewType==='rect')drawRect();
-  else if(viewType==='lshape')drawLShape();
-  else if(viewType==='trench')drawTrench();
+  var viewType=data.t;
+  if(viewType===0)drawRect();
+  else if(viewType===1)drawLShape();
+  else if(viewType===2)drawTrench();
 }
 
 function drawRect(){
@@ -162,6 +216,18 @@ function drawRect(){
     innerFaces=[{pts:[I5,I6,I7,I8],c:'#85c1e9',b:'#5dade2',d:true}];
   }
   sortFaces(faces,innerFaces).forEach(function(f){drawFace(f.pts,f.c,f.b,f.d?1:1.5,f.d);});
+  
+  if(data.sg&&data.sg.length>1){
+    var pos=0;
+    for(var i=0;i<data.sg.length-1;i++){
+      pos+=data.sg[i];
+      var p1=proj(pos,0,0);
+      var p2=proj(pos,0,W);
+      ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);
+      ctx.strokeStyle='#999';ctx.lineWidth=1;ctx.setLineDash([6,4]);ctx.stroke();ctx.setLineDash([]);
+    }
+  }
+  
   if(data.hs&&data.hs.length>0){
     drawHoleFill(proj,data.hs);
     drawHoleStroke(proj,data.hs,0);
@@ -170,7 +236,9 @@ function drawRect(){
 
 function drawLShape(){
   var LL=data.ll,LW=data.lw,SL=data.sl,SW=data.sw,H=data.h;
-  var pos=data.p||'top-right';
+  var posIndex=data.p||0;
+  var posNames=['top-right','top-left','bottom-right','bottom-left'];
+  var pos=posNames[posIndex];
   var TW=LL,TD=LW+SW;
   var cx=TW/2,cy=H/2,cz=TD/2;
   var maxP=Math.sqrt(TW*TW+TD*TD+H*H);
@@ -232,21 +300,22 @@ canvas.addEventListener('touchend',function(e){if(e.touches.length<2)pinching=fa
 
 var infoHtml='<h2>地漏3D视图</h2>';
 if(data){
-  if(data.i){
-    if(data.i.n)infoHtml+='<div>编号：'+data.i.n+'</div>';
-    if(data.i.s)infoHtml+='<div>面盖款式：'+data.i.s+'</div>';
-  }
-  if(data.t==='rect'){
+  if(data.t===0){
+    infoHtml+='<div>类型：矩形地漏</div>';
     infoHtml+='<div>长度：'+data.l+' mm</div>';
     infoHtml+='<div>宽度：'+data.w+' mm</div>';
     infoHtml+='<div>高度：'+data.h+' mm</div>';
     infoHtml+='<div>厚度：'+data.tk+' mm</div>';
-  }else if(data.t==='lshape'){
+    if(data.sg&&data.sg.length>1){
+      infoHtml+='<div>分段：'+data.sg.join('+')+' mm</div>';
+    }
+  }else if(data.t===1){
     infoHtml+='<div>长边长度：'+data.ll+' mm</div>';
     infoHtml+='<div>长边宽度：'+data.lw+' mm</div>';
     infoHtml+='<div>短边长度：'+data.sl+' mm</div>';
     infoHtml+='<div>短边宽度：'+data.sw+' mm</div>';
-  }else if(data.t==='trench'){
+  }else if(data.t===2){
+    infoHtml+='<div>类型：排水沟</div>';
     infoHtml+='<div>长度：'+data.l+' mm</div>';
     infoHtml+='<div>宽度：'+data.w+' mm</div>';
     infoHtml+='<div>高度：'+data.h+' mm</div>';
@@ -258,6 +327,7 @@ if(data){
 }
 document.getElementById('info').innerHTML=infoHtml;
 resize();
+if(data)draw();
 </script>
 </body>
 </html>
