@@ -48,17 +48,15 @@
         function parseParams() {
             const p = new URLSearchParams(location.search);
             const layers = parseInt(p.get('l')) || 3;
-            const layerHeightsStr = p.get('lh') || '';
-            let layerHeights = layerHeightsStr.split(',').map(Number).filter(n => !isNaN(n));
             const totalHeight = parseInt(p.get('h')) || 880;
+            const thickness = parseInt(p.get('t')) || 10;
 
-            if (layerHeights.length !== layers) {
-                layerHeights = [];
-                const avg = Math.floor(totalHeight / layers);
-                for (let i = 0; i < layers; i++) layerHeights.push(avg);
-                const sum = layerHeights.reduce((a, b) => a + b, 0);
-                if (sum < totalHeight) layerHeights[layers - 1] += totalHeight - sum;
-            }
+            // viewer.html 自行均分每层高度
+            const remaining = totalHeight - thickness * (layers - 1);
+            const avg = Math.floor(remaining / layers);
+            let layerHeights = Array(layers).fill(avg);
+            const sum = avg * layers;
+            layerHeights[layers - 1] += remaining - sum;
 
             const width = parseInt(p.get('w')) || 260;
             const depth = parseInt(p.get('d')) || 250;
@@ -66,13 +64,13 @@
             const bottomFold = parseInt(p.get('fb')) || 10;
             const leftFold = parseInt(p.get('fl')) || 10;
             const rightFold = parseInt(p.get('fr')) || 10;
-            const extension = parseInt(p.get('ext')) || 5;
+            const extension = parseInt(p.get('e')) || 5;
 
             return {
                 width: width,
                 depth: depth,
                 layers: layers,
-                layerThickness: parseInt(p.get('t')) || 10,
+                layerThickness: thickness,
                 extension: extension,
                 totalHeight: totalHeight,
                 topFold: topFold,
