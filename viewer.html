@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>地漏3D视图</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;overflow:hidden;touch-action:none}
+canvas{display:block;width:100vw;height:100vh}
+.info{position:fixed;top:12px;left:12px;background:rgba(0,0,0,0.6);backdrop-filter:blur(10px);border-radius:12px;padding:14px 18px;font-size:13px;line-height:1.8;pointer-events:none;max-width:260px}
+.info h2{font-size:16px;margin-bottom:6px;color:#3498db}
+.info .inner{color:#e74c3c}
+.hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);border-radius:20px;padding:8px 20px;font-size:12px;color:rgba(255,255,255,0.7);pointer-events:none;white-space:nowrap}
+.reset-btn{position:fixed;top:12px;right:12px;background:rgba(52,152,219,0.8);border:none;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;cursor:pointer;backdrop-filter:blur(8px)}
+.reset-btn:active{background:rgba(41,128,185,0.9)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button class="reset-btn" onclick="resetView()">重置视角</button>
+<div class="hint">单指拖拽旋转 · 双指缩放</div>
+<div class="info" id="info"></div>
+<script>
+function getData(){
+  try{
+    var hash=decodeURIComponent(location.hash.slice(1));
+    if(!hash)return null;
+    var json=decodeURIComponent(escape(atob(hash)));
+    return JSON.parse(json);
+  }catch(e){return null;}
+}
+var data=getData();
+if(!data){document.body.innerHTML='<div style="color:#fff;text-align:center;padding-top:40vh;font-size:18px;">参数错误或无参数<br>请通过正规渠道扫码访问</div>';}
+
+var rotX=-0.5,rotY=0.7,zoom=1;
+var dragging=false,lastX=0,lastY=0;
+var pinching=false,lastDist=0;
+var canvas=document.getElementById('c');
+var ctx=canvas.getContext('2d');
+
+function resize(){canvas.width=window.innerWidth*devicePixelRatio;canvas.height=window.innerHeight*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);draw();}
+window.addEventListener('resize',resize);
+function resetView(){rotX=-0.5;rotY=0.7;zoom=1;draw();}
+
+function rotatePoint(x,y,z,cx,cy,cz){
+  var px=x-cx,py=y-cy,pz=z-cz;
+  var cosY=Math.cos(rotY),sinY=Math.sin(rotY);
+  var rx=px*cosY+pz*sinY,rz=-px*sinY+pz*cosY;
+  px=rx;pz=rz;
+  var cosX=Math.cos(rotX),sinX=Math.sin(rotX);
+  var ry=py*cosX-pz*sinX,rz2=py*sinX+pz*cosX;
+  py=ry;pz=rz2;
+  return{x:px+cx,y:py+cy,z:pz+cz};
+}
+
+function project(x,y,z,cx,cy,cz,maxP){
+  var r=rotatePoint(x,y,z,cx,cy,cz);
+  var bs=Math.min(window.innerWidth,window.innerHeight)/(maxP*1.5);
+  var s=bs*zoom;
+  return{x:window.innerWidth/2+(r.x-cx)*s,y:window.innerHeight/2-(r.y-cy)*s,z:r.z};
+}
+
+function drawFace(pts,fillColor,strokeColor,lw,dashed){
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+  for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+  ctx.closePath();ctx.fillStyle=fillColor;ctx.fill();
+  ctx.strokeStyle=strokeColor;ctx.lineWidth=lw;
+  if(dashed)ctx.setLineDash([4,3]);
+  ctx.stroke();ctx.setLineDash([]);
+}
+
+function drawHoleFill(projectFn,holesData){
+  ctx.save();ctx.globalCompositeOperation='destination-out';
+  holesData.forEach(function(hole){
+    if(hole.type==='slot'){
+      var sl=45,sw=23;
+      var p1=projectFn(hole.x-sl/2,0,hole.z-sw/2),p2=projectFn(hole.x+sl/2,0,hole.z-sw/2);
+      var p3=projectFn(hole.x+sl/2,0,hole.z+sw/2),p4=projectFn(hole.x-sl/2,0,hole.z+sw/2);
+      ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);ctx.closePath();ctx.fill();
+    }else{
+      var r=hole.diameter/2;var segs=24;ctx.beginPath();
+      for(var i=0;i<=segs;i++){var a=(i/segs)*Math.PI*2;var px=hole.x+r*Math.cos(a);var pz=hole.z+r*Math.sin(a);var pr=projectFn(px,0,pz);if(i===0)ctx.moveTo(pr.x,pr.y);else ctx.lineTo(pr.x,pr.y);}
+      ctx.closePath();ctx.fill();
+    }
+  });
+  ctx.restore();
+}
+
+function drawHoleStroke(projectFn,holesData,offset){
+  var holeColors=['#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22'];
+  holesData.forEach(function(hole,idx){
+    var hc=holeColors[(idx+offset)%holeColors.length];
+    if(hole.type==='slot'){
+      var sl=45,sw=23;
+      var p1=projectFn(hole.x-sl/2,0,hole.z-sw/2),p2=projectFn(hole.x+sl/2,0,hole.z-sw/2);
+      var p3=projectFn(hole.x+sl/2,0,hole.z+sw/2),p4=projectFn(hole.x-sl/2,0,hole.z+sw/2);
+      ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);ctx.closePath();
+      ctx.strokeStyle=hc;ctx.lineWidth=3;ctx.stroke();
+    }else{
+      var r=hole.diameter/2;var segs=24;ctx.beginPath();
+      for(var i=0;i<=segs;i++){var a=(i/segs)*Math.PI*2;var px=hole.x+r*Math.cos(a);var pz=hole.z+r*Math.sin(a);var pr=projectFn(px,0,pz);if(i===0)ctx.moveTo(pr.x,pr.y);else ctx.lineTo(pr.x,pr.y);}
+      ctx.closePath();ctx.strokeStyle=hc;ctx.lineWidth=3;ctx.stroke();
+    }
+  });
+}
+
+function sortFaces(faces,innerFaces){
+  faces.forEach(function(f){f.z=f.pts.reduce(function(s,p){return s+p.z},0)/f.pts.length});
+  innerFaces.forEach(function(f){f.z=f.pts.reduce(function(s,p){return s+p.z},0)/f.pts.length});
+  var all=faces.concat(innerFaces);all.sort(function(a,b){return a.z-b.z});
+  return all;
+}
+
+function draw(){
+  if(!data)return;
+  var w=window.innerWidth,h=window.innerHeight;
+  ctx.clearRect(0,0,w,h);
+  if(data.type==='rect')drawRect();
+  else if(data.type==='lshape')drawLShape();
+  else if(data.type==='trench')drawTrench();
+}
+
+function drawRect(){
+  var L=data.length,W=data.width,H=data.height,T=data.thickness;
+  var cx=L/2,cy=H/2,cz=W/2;
+  var maxP=Math.sqrt(L*L+W*W+H*H);
+  function proj(x,y,z){return project(x,y,z,cx,cy,cz,maxP);}
+  var A=proj(0,0,0),B=proj(L,0,0),C=proj(L,H,0),D=proj(0,H,0);
+  var E=proj(0,0,W),F=proj(L,0,W),G=proj(L,H,W),Hp=proj(0,H,W);
+  var faces=[
+    {pts:[A,B,C,D],c:'#3498db',b:'#2980b9'},
+    {pts:[B,F,G,C],c:'#5dade2',b:'#3498db'},
+    {pts:[A,E,F,B],c:'#2980b9',b:'#1a5276'},
+    {pts:[A,D,Hp,E],c:'#5499c7',b:'#2e86c1'},
+    {pts:[E,F,G,Hp],c:'#2e86c1',b:'#1b4f72'}
+  ];
+  var IL=L-2*T,IW=W-2*T,IH=H-T;
+  var innerFaces=[];
+  if(T>0&&IL>0&&IW>0&&IH>0){
+    var I5=proj(T,T,T),I6=proj(L-T,T,T),I7=proj(L-T,T,W-T),I8=proj(T,T,W-T);
+    innerFaces=[{pts:[I5,I6,I7,I8],c:'#85c1e9',b:'#5dade2',d:true}];
+  }
+  sortFaces(faces,innerFaces).forEach(function(f){drawFace(f.pts,f.c,f.b,f.d?1:1.5,f.d);});
+  if(data.holes&&data.holes.length>0){
+    drawHoleFill(proj,data.holes);
+    drawHoleStroke(proj,data.holes,0);
+  }
+}
+
+function drawLShape(){
+  var LL=data.longLength,LW=data.longWidth,SL=data.shortLength,SW=data.shortWidth,H=data.height;
+  var pos=data.position||'top-right';
+  var TW=LL,TD=LW+SW;
+  var cx=TW/2,cy=H/2,cz=TD/2;
+  var maxP=Math.sqrt(TW*TW+TD*TD+H*H);
+  function proj(x,y,z){return project(x,y,z,cx,cy,cz,maxP);}
+  var tv,bv;
+  if(pos==='top-right'){tv=[proj(0,H,SW),proj(LL-SL,H,SW),proj(LL-SL,H,0),proj(LL,H,0),proj(LL,H,LW+SW),proj(0,H,LW+SW)];bv=[proj(0,0,SW),proj(LL-SL,0,SW),proj(LL-SL,0,0),proj(LL,0,0),proj(LL,0,LW+SW),proj(0,0,LW+SW)];}
+  else if(pos==='top-left'){tv=[proj(0,H,0),proj(SL,H,0),proj(SL,H,SW),proj(LL,H,SW),proj(LL,H,LW+SW),proj(0,H,LW+SW)];bv=[proj(0,0,0),proj(SL,0,0),proj(SL,0,SW),proj(LL,0,SW),proj(LL,0,LW+SW),proj(0,0,LW+SW)];}
+  else if(pos==='bottom-right'){tv=[proj(0,H,0),proj(LL,H,0),proj(LL,H,LW+SW),proj(LL-SL,H,LW+SW),proj(LL-SL,H,LW),proj(0,H,LW)];bv=[proj(0,0,0),proj(LL,0,0),proj(LL,0,LW+SW),proj(LL-SL,0,LW+SW),proj(LL-SL,0,LW),proj(0,0,LW)];}
+  else{tv=[proj(0,H,0),proj(LL,H,0),proj(LL,H,LW),proj(SL,H,LW),proj(SL,H,LW+SW),proj(0,H,LW+SW)];bv=[proj(0,0,0),proj(LL,0,0),proj(LL,0,LW),proj(SL,0,LW),proj(SL,0,LW+SW),proj(0,0,LW+SW)];}
+  var faces=[{pts:bv,c:'#2980b9',b:'#1a5276'}];
+  var sc=['#3498db','#5dade2','#5499c7','#2e86c1','#85c1e9','#5dade2'];
+  var sb=['#2980b9','#3498db','#2e86c1','#1b4f72','#5dade2','#3498db'];
+  for(var i=0;i<6;i++){var n=(i+1)%6;faces.push({pts:[tv[i],tv[n],bv[n],bv[i]],c:sc[i],b:sb[i]});}
+  faces.forEach(function(f){f.z=f.pts.reduce(function(s,p){return s+p.z},0)/f.pts.length});
+  faces.sort(function(a,b){return a.z-b.z});
+  faces.forEach(function(f){drawFace(f.pts,f.c,f.b,2,false);});
+  if(data.holes&&data.holes.length>0){
+    drawHoleFill(proj,data.holes);
+    drawHoleStroke(proj,data.holes,0);
+  }
+  if(data.shortHoles&&data.shortHoles.length>0){
+    drawHoleFill(proj,data.shortHoles);
+    drawHoleStroke(proj,data.shortHoles,data.holes?data.holes.length:0);
+  }
+}
+
+function drawTrench(){
+  var L=data.length,W=data.width,H=data.height,T=data.thickness;
+  var IL=L-2*T,IW=W-2*T,IH=H-T;
+  var hasInner=T>0&&IL>0&&IW>0&&IH>0;
+  var cx=L/2,cy=H/2,cz=W/2;
+  var maxP=Math.sqrt(L*L+W*W+H*H);
+  function proj(x,y,z){return project(x,y,z,cx,cy,cz,maxP);}
+  var A=proj(0,0,0),B=proj(L,0,0),C=proj(L,H,0),D=proj(0,H,0);
+  var E=proj(0,0,W),F=proj(L,0,W),G=proj(L,H,W),Hp=proj(0,H,W);
+  var faces=[
+    {pts:[A,B,C,D],c:'#3498db',b:'#2980b9'},
+    {pts:[B,F,G,C],c:'#5dade2',b:'#3498db'},
+    {pts:[A,E,F,B],c:'#2980b9',b:'#1a5276'},
+    {pts:[A,D,Hp,E],c:'#5499c7',b:'#2e86c1'},
+    {pts:[E,F,G,Hp],c:'#2e86c1',b:'#1b4f72'}
+  ];
+  var innerFaces=[];
+  if(hasInner){
+    var I5=proj(T,T,T),I6=proj(L-T,T,T),I7=proj(L-T,T,W-T),I8=proj(T,T,W-T);
+    innerFaces=[{pts:[I5,I6,I7,I8],c:'#85c1e9',b:'#5dade2',d:true}];
+  }
+  sortFaces(faces,innerFaces).forEach(function(f){drawFace(f.pts,f.c,f.b,f.d?1:1.5,f.d);});
+}
+
+canvas.addEventListener('mousedown',function(e){dragging=true;lastX=e.clientX;lastY=e.clientY});
+canvas.addEventListener('mousemove',function(e){if(!dragging)return;rotY+=(e.clientX-lastX)*0.01;rotX+=(e.clientY-lastY)*0.01;rotX=Math.max(-1.0,Math.min(0.3,rotX));lastX=e.clientX;lastY=e.clientY;draw();});
+canvas.addEventListener('mouseup',function(){dragging=false});
+canvas.addEventListener('mouseleave',function(){dragging=false});
+canvas.addEventListener('wheel',function(e){e.preventDefault();zoom*=e.deltaY>0?0.9:1.1;zoom=Math.max(0.3,Math.min(3,zoom));draw();},{passive:false});
+canvas.addEventListener('touchstart',function(e){e.preventDefault();if(e.touches.length===1){dragging=true;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY}else if(e.touches.length===2){dragging=false;pinching=true;var dx=e.touches[0].clientX-e.touches[1].clientX;var dy=e.touches[0].clientY-e.touches[1].clientY;lastDist=Math.sqrt(dx*dx+dy*dy);}},{passive:false});
+canvas.addEventListener('touchmove',function(e){e.preventDefault();if(e.touches.length===1&&dragging){rotY+=(e.touches[0].clientX-lastX)*0.01;rotX+=(e.touches[0].clientY-lastY)*0.01;rotX=Math.max(-1.0,Math.min(0.3,rotX));lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;draw();}else if(e.touches.length===2&&pinching){var dx=e.touches[0].clientX-e.touches[1].clientX;var dy=e.touches[0].clientY-e.touches[1].clientY;var dist=Math.sqrt(dx*dx+dy*dy);zoom*=dist/lastDist;zoom=Math.max(0.3,Math.min(3,zoom));lastDist=dist;draw();}},{passive:false});
+canvas.addEventListener('touchend',function(e){if(e.touches.length<2)pinching=false;if(e.touches.length===0)dragging=false;});
+
+var infoHtml='<h2>地漏3D视图</h2>';
+if(data){
+  if(data.productInfo){
+    if(data.productInfo.number)infoHtml+='<div>编号：'+data.productInfo.number+'</div>';
+    if(data.productInfo.panelStyle)infoHtml+='<div>面盖款式：'+data.productInfo.panelStyle+'</div>';
+  }
+  if(data.type==='rect'){
+    infoHtml+='<div>长度：'+data.length+' mm</div>';
+    infoHtml+='<div>宽度：'+data.width+' mm</div>';
+    infoHtml+='<div>高度：'+data.height+' mm</div>';
+    infoHtml+='<div>厚度：'+data.thickness+' mm</div>';
+  }else if(data.type==='lshape'){
+    infoHtml+='<div>长边长度：'+data.longLength+' mm</div>';
+    infoHtml+='<div>长边宽度：'+data.longWidth+' mm</div>';
+    infoHtml+='<div>短边长度：'+data.shortLength+' mm</div>';
+    infoHtml+='<div>短边宽度：'+data.shortWidth+' mm</div>';
+  }else if(data.type==='trench'){
+    infoHtml+='<div>长度：'+data.length+' mm</div>';
+    infoHtml+='<div>宽度：'+data.width+' mm</div>';
+    infoHtml+='<div>高度：'+data.height+' mm</div>';
+    infoHtml+='<div>厚度：'+data.thickness+' mm</div>';
+    if(data.thickness>0&&data.length-2*data.thickness>0&&data.width-2*data.thickness>0&&data.height-data.thickness>0){
+      infoHtml+='<div class="inner">内槽：'+(data.length-2*data.thickness)+'×'+(data.width-2*data.thickness)+'×'+(data.height-data.thickness)+' mm</div>';
+    }
+  }
+}
+document.getElementById('info').innerHTML=infoHtml;
+resize();
+</script>
+</body>
+</html>
