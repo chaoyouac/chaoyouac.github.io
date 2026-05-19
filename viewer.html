@@ -326,9 +326,10 @@ canvas.addEventListener('click',function(e){
     var cx=e.clientX-rect.left;
     var cy=e.clientY-rect.top;
     if(!isZoomed){
-      panX=window.innerWidth/2-cx;
-      panY=window.innerHeight/2-cy;
-      zoom=Math.min(zoom*2.5,20);
+      var factor=2.5;
+      panX+=(cx-window.innerWidth/2)*(1-factor);
+      panY+=(cy-window.innerHeight/2)*(1-factor);
+      zoom=Math.min(zoom*factor,20);
       isZoomed=true;
     }else{
       panX=0;panY=0;zoom=1;isZoomed=false;
@@ -352,9 +353,10 @@ canvas.addEventListener('touchend',function(e){
     var cx=lastTouchX-rect.left;
     var cy=lastTouchY-rect.top;
     if(!isZoomed){
-      panX=window.innerWidth/2-cx;
-      panY=window.innerHeight/2-cy;
-      zoom=Math.min(zoom*2.5,20);
+      var factor=2.5;
+      panX+=(cx-window.innerWidth/2)*(1-factor);
+      panY+=(cy-window.innerHeight/2)*(1-factor);
+      zoom=Math.min(zoom*factor,20);
       isZoomed=true;
     }else{
       panX=0;panY=0;zoom=1;isZoomed=false;
