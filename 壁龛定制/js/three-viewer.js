@@ -148,6 +148,9 @@ const ThreeViewer = (function() {
 
         // 1. 折边（正面四周，向后延伸 extension）
         const extHalf = extension / 2;
+        const outerH = totalHeight + topFold + bottomFold;
+        const foldYOffset = (bottomFold - topFold) / 2;
+
         if (topFold > 0 && extension > 0) {
             addPanel(width + leftFold + rightFold, topFold, extension,
                 (rightFold - leftFold) / 2,
@@ -161,15 +164,15 @@ const ThreeViewer = (function() {
                 extHalf);
         }
         if (leftFold > 0 && extension > 0) {
-            addPanel(leftFold, totalHeight, extension,
+            addPanel(leftFold, outerH, extension,
                 -width / 2 - leftFold / 2,
-                0,
+                foldYOffset,
                 extHalf);
         }
         if (rightFold > 0 && extension > 0) {
-            addPanel(rightFold, totalHeight, extension,
+            addPanel(rightFold, outerH, extension,
                 width / 2 + rightFold / 2,
-                0,
+                foldYOffset,
                 extHalf);
         }
 
