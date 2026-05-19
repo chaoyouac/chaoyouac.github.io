@@ -162,6 +162,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 text: url,
                 width: 128,
                 height: 128,
+                typeNumber: 15,
                 colorDark: '#000000',
                 colorLight: '#ffffff',
                 correctLevel: QRCode.CorrectLevel.L
