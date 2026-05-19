@@ -16,7 +16,7 @@
             border-radius: 8px;
             font-size: 13px;
             z-index: 10;
-            max-width: 260px;
+            max-width: 280px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         #info h2 { font-size: 15px; margin-bottom: 8px; color: #222; }
@@ -66,12 +66,14 @@
             const bottomFold = parseInt(p.get('fb')) || 10;
             const leftFold = parseInt(p.get('fl')) || 10;
             const rightFold = parseInt(p.get('fr')) || 10;
+            const extension = parseInt(p.get('ext')) || 5;
 
             return {
                 width: width,
                 depth: depth,
                 layers: layers,
                 layerThickness: parseInt(p.get('t')) || 10,
+                extension: extension,
                 totalHeight: totalHeight,
                 topFold: topFold,
                 bottomFold: bottomFold,
@@ -91,6 +93,7 @@
             <p class="red">外径: ${outerW} x ${outerH} mm</p>
             <p>内径: ${params.width} x ${params.totalHeight} mm</p>
             <p>深度: ${params.depth} mm</p>
+            <p>外框延伸: ${params.extension} mm</p>
             <p>层数: ${params.layers} 层</p>
         `;
 
