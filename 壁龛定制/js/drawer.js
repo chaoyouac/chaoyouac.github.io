@@ -26,7 +26,7 @@ const Drawer = (function() {
 
     function drawDimension(ctx, x1, y1, x2, y2, text, offset, side) {
         ctx.save();
-        ctx.font = 'bold 15px Arial, sans-serif';
+        ctx.font = 'bold 16px Arial, sans-serif';
         ctx.fillStyle = '#e74c3c';
         ctx.strokeStyle = '#e74c3c';
         ctx.lineWidth = 1.2;
@@ -82,7 +82,7 @@ const Drawer = (function() {
         const logicalW = canvas.width / dpr;
         const logicalH = canvas.height / dpr;
 
-        const margin = 60;
+        const margin = 65;
         const availW = logicalW - margin * 2;
         const availH = logicalH - margin * 2;
         const scale = Math.min(availW / outerW, availH / outerH) * 0.88;
@@ -122,17 +122,17 @@ const Drawer = (function() {
         }
 
         // 尺寸标注
-        drawDimension(ctx, startX, startY, startX + drawW, startY, outerW.toString(), 38, 'top');
-        drawDimension(ctx, innerX, innerY, innerX + innerW, innerY, width.toString(), 20, 'top');
-        drawDimension(ctx, startX, startY, startX, startY + drawH, outerH.toString(), 42, 'left');
-        drawDimension(ctx, innerX, innerY, innerX, innerY + innerH, totalHeight.toString(), 24, 'left');
+        drawDimension(ctx, startX, startY, startX + drawW, startY, outerW.toString(), 42, 'top');
+        drawDimension(ctx, innerX, innerY, innerX + innerW, innerY, width.toString(), 22, 'top');
+        drawDimension(ctx, startX, startY, startX, startY + drawH, outerH.toString(), 46, 'left');
+        drawDimension(ctx, innerX, innerY, innerX, innerY + innerH, totalHeight.toString(), 26, 'left');
 
         currentY = innerY;
         for (let i = 0; i < layers; i++) {
             const h = layerHeights[i];
             const nextY = currentY + h * scale;
-            if (h * scale > 22) {
-                drawDimension(ctx, innerX + innerW, currentY, innerX + innerW, nextY, h.toString(), 18, 'right');
+            if (h * scale > 24) {
+                drawDimension(ctx, innerX + innerW, currentY, innerX + innerW, nextY, h.toString(), 20, 'right');
             }
             currentY = nextY;
         }
@@ -140,24 +140,24 @@ const Drawer = (function() {
         if (layers > 1) {
             const shelfCenterY = innerY + layerHeights[0] * scale;
             ctx.fillStyle = '#e74c3c';
-            ctx.font = 'bold 15px Arial, sans-serif';
-            ctx.fillText(layerThickness.toString(), innerX + innerW + 24, shelfCenterY + 5);
+            ctx.font = 'bold 16px Arial, sans-serif';
+            ctx.fillText(layerThickness.toString(), innerX + innerW + 26, shelfCenterY + 5);
         }
     }
 
     function drawSideView(canvas, params) {
         const ctx = canvas.getContext('2d');
-        const { depth, totalHeight, layers, layerThickness, extension,
-                topFold, bottomFold, layerHeights } = params;
+        const { depth, totalHeight, layers, layerThickness, extension, layerHeights } = params;
 
+        // 侧面视图：宽度 = 深度 + 延伸，高度 = 总高度
         const outerW = depth + extension;
-        const outerH = totalHeight + topFold + bottomFold;
+        const outerH = totalHeight;
 
         const dpr = window.devicePixelRatio || 1;
         const logicalW = canvas.width / dpr;
         const logicalH = canvas.height / dpr;
 
-        const margin = 60;
+        const margin = 65;
         const availW = logicalW - margin * 2;
         const availH = logicalH - margin * 2;
         const scale = Math.min(availW / outerW, availH / outerH) * 0.88;
@@ -171,17 +171,14 @@ const Drawer = (function() {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, logicalW, logicalH);
 
-        // 外框
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2.5;
-        ctx.strokeRect(startX, startY, drawW, drawH);
-
-        // 内框
-        const innerX = startX;
-        const innerY = startY + topFold * scale;
+        // 内框矩形（深度 × 总高度）
         const innerW = depth * scale;
         const innerH = totalHeight * scale;
-        ctx.lineWidth = 2;
+        const innerX = startX;
+        const innerY = startY;
+
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2.5;
         ctx.strokeRect(innerX, innerY, innerW, innerH);
 
         // 层板（水平线）
@@ -195,32 +192,58 @@ const Drawer = (function() {
             ctx.stroke();
         }
 
-        // 外框延伸标注
-        if (extension * scale > 8) {
-            ctx.fillStyle = '#e74c3c';
-            ctx.font = 'bold 15px Arial, sans-serif';
-            ctx.fillText(extension.toString(), startX + innerW + (extension * scale) / 2 - 5, startY + 18);
-            ctx.strokeStyle = '#e74c3c';
-            ctx.lineWidth = 1.2;
+        // 外框延伸线（右侧，只画线条，不画完整矩形）
+        if (extension > 0) {
+            const extX = innerX + innerW + extension * scale;
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#000000';
+
+            // 右侧竖线
             ctx.beginPath();
-            ctx.moveTo(startX + innerW, startY + 6);
-            ctx.lineTo(startX + innerW, startY + 28);
+            ctx.moveTo(extX, innerY);
+            ctx.lineTo(extX, innerY + innerH);
             ctx.stroke();
+
+            // 顶部横线连接
             ctx.beginPath();
-            ctx.moveTo(startX + drawW, startY + 6);
-            ctx.lineTo(startX + drawW, startY + 28);
+            ctx.moveTo(innerX + innerW, innerY);
+            ctx.lineTo(extX, innerY);
             ctx.stroke();
+
+            // 底部横线连接
             ctx.beginPath();
-            ctx.moveTo(startX + innerW, startY + 17);
-            ctx.lineTo(startX + drawW, startY + 17);
+            ctx.moveTo(innerX + innerW, innerY + innerH);
+            ctx.lineTo(extX, innerY + innerH);
             ctx.stroke();
+
+            // extension 标注
+            if (extension * scale > 10) {
+                ctx.fillStyle = '#e74c3c';
+                ctx.font = 'bold 16px Arial, sans-serif';
+                ctx.fillText(extension.toString(), innerX + innerW + (extension * scale) / 2 - 5, innerY + 20);
+                ctx.strokeStyle = '#e74c3c';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(innerX + innerW, innerY + 6);
+                ctx.lineTo(innerX + innerW, innerY + 32);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(extX, innerY + 6);
+                ctx.lineTo(extX, innerY + 32);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(innerX + innerW, innerY + 19);
+                ctx.lineTo(extX, innerY + 19);
+                ctx.stroke();
+            }
         }
 
         // 尺寸标注
-        drawDimension(ctx, startX, startY, startX, startY + drawH, outerH.toString(), 38, 'left');
-        drawDimension(ctx, innerX + innerW, innerY, innerX + innerW, innerY + innerH, totalHeight.toString(), 22, 'right');
+        // 总高度（左侧）
+        drawDimension(ctx, innerX, innerY, innerX, innerY + innerH, totalHeight.toString(), 42, 'left');
+        // 深度（中间横向）
         const midY = innerY + innerH / 2;
-        drawDimension(ctx, innerX, midY, innerX + innerW, midY, depth.toString(), 22, 'bottom');
+        drawDimension(ctx, innerX, midY, innerX + innerW, midY, depth.toString(), 24, 'bottom');
     }
 
     function drawCombinedView(canvas, frontCanvas, sideCanvas) {
@@ -233,18 +256,16 @@ const Drawer = (function() {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, logicalW, logicalH);
 
-        const gap = 24; // 中间虚线间距
+        const gap = 24;
         const leftAreaW = (logicalW - gap) / 2;
         const rightAreaW = (logicalW - gap) / 2;
         const areaH = logicalH;
 
-        // 获取 front/side 的逻辑尺寸
         const fW = frontCanvas.width / dpr;
         const fH = frontCanvas.height / dpr;
         const sW = sideCanvas.width / dpr;
         const sH = sideCanvas.height / dpr;
 
-        // 等比缩放到各自区域并居中
         const fScale = Math.min(leftAreaW / fW, areaH / fH) * 0.95;
         const sScale = Math.min(rightAreaW / sW, areaH / sH) * 0.95;
 
