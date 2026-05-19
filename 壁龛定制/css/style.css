@@ -13,7 +13,7 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1600px;
     margin: 0 auto;
     padding: 16px;
 }
@@ -249,11 +249,11 @@ button:active {
     }
     
     #combinedView {
-        max-height: 520px;
+        max-height: 680px;
     }
     
     #three-container {
-        height: 480px;
+        height: 580px;
     }
 }
 
