@@ -167,22 +167,22 @@ button:active {
 }
 
 .views-wrapper {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 16px;
-}
-
-.view-box {
+    position: relative;
     text-align: center;
 }
 
-.view-box canvas {
+#combinedView {
     width: 100%;
     max-width: 100%;
     height: auto;
     border: 1px solid #eee;
     border-radius: 8px;
     background: #fff;
+    display: block;
+}
+
+#frontView, #sideView {
+    display: none;
 }
 
 #qrcode-wrapper {
@@ -248,8 +248,8 @@ button:active {
         gap: 10px;
     }
     
-    .views-wrapper {
-        grid-template-columns: 1fr 1fr;
+    #combinedView {
+        max-height: 520px;
     }
     
     #three-container {
