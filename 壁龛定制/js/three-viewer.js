@@ -102,8 +102,8 @@ const ThreeViewer = (function() {
         const { width: pw, totalHeight, depth, topFold, bottomFold, leftFold, rightFold, extension } = params;
         const outerW = pw + leftFold + rightFold;
         const outerH = totalHeight + topFold + bottomFold;
-        const outerD = depth + extension;
-        const maxDim = Math.max(outerW, outerH, outerD);
+        // depth 已包含延伸
+        const maxDim = Math.max(outerW, outerH, depth);
         const distance = maxDim * 1.6;
         camera.position.set(distance * 0.6, distance * 0.5, distance);
         camera.lookAt(0, 0, outerD / 2);
@@ -131,6 +131,9 @@ const ThreeViewer = (function() {
 
         const { width, totalHeight, depth, layers, layerThickness, extension,
                 topFold, bottomFold, leftFold, rightFold, layerHeights } = params;
+
+        // depth 参数已包含延伸，所以内框主体深度 = depth - extension
+        const bodyDepth = depth - extension;
 
         const material = new THREE.MeshPhongMaterial({
             color: 0x2c2c2c,
@@ -177,33 +180,33 @@ const ThreeViewer = (function() {
         }
 
         // 2. 主体五面板（背、顶、底、左、右），正面开口
-        const bodyStartZ = extension + depth / 2;
+        const bodyStartZ = extension + bodyDepth / 2;
 
         // 背板
         addPanel(width, totalHeight, layerThickness,
-            0, 0, extension + depth - layerThickness / 2);
+            0, 0, extension + bodyDepth - layerThickness / 2);
 
         // 顶板
-        addPanel(width, layerThickness, depth,
+        addPanel(width, layerThickness, bodyDepth,
             0, totalHeight / 2 - layerThickness / 2, bodyStartZ);
 
         // 底板
-        addPanel(width, layerThickness, depth,
+        addPanel(width, layerThickness, bodyDepth,
             0, -totalHeight / 2 + layerThickness / 2, bodyStartZ);
 
         // 左侧板
-        addPanel(layerThickness, totalHeight, depth,
+        addPanel(layerThickness, totalHeight, bodyDepth,
             -width / 2 + layerThickness / 2, 0, bodyStartZ);
 
         // 右侧板
-        addPanel(layerThickness, totalHeight, depth,
+        addPanel(layerThickness, totalHeight, bodyDepth,
             width / 2 - layerThickness / 2, 0, bodyStartZ);
 
         // 3. 层板
         let currentY = -totalHeight / 2;
         for (let i = 0; i < layers - 1; i++) {
             currentY += layerHeights[i];
-            addPanel(width, layerThickness, depth,
+            addPanel(width, layerThickness, bodyDepth,
                 0, currentY, bodyStartZ);
         }
 
