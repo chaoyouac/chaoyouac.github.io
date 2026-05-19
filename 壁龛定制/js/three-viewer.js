@@ -135,21 +135,26 @@ const ThreeViewer = (function() {
         // depth 参数已包含延伸，所以内框主体深度 = depth - extension
         const bodyDepth = depth - extension;
 
-        const material = new THREE.MeshPhongMaterial({
-            color: 0x2c2c2c,
+        const bodyMaterial = new THREE.MeshPhongMaterial({
+            color: 0x222222,
             shininess: 50,
+            side: THREE.DoubleSide
+        });
+        const foldMaterial = new THREE.MeshPhongMaterial({
+            color: 0x555555,
+            shininess: 60,
             side: THREE.DoubleSide
         });
 
         // 辅助函数：只创建实体板件，不添加线框
-        function addPanel(w, h, d, x, y, z) {
+        function addPanel(w, h, d, x, y, z, mat) {
             const geo = new THREE.BoxGeometry(w, h, d);
-            const mesh = new THREE.Mesh(geo, material);
+            const mesh = new THREE.Mesh(geo, mat || bodyMaterial);
             mesh.position.set(x, y, z);
             meshGroup.add(mesh);
         }
 
-        // 1. 折边（正面四周，向后延伸 extension）
+        // 1. 折边（正面四周，向后延伸 extension）—— 用 foldMaterial 以便视觉上突出
         const extHalf = extension / 2;
         const outerH = totalHeight + topFold + bottomFold;
         const foldYOffset = (bottomFold - topFold) / 2;
@@ -158,25 +163,25 @@ const ThreeViewer = (function() {
             addPanel(width + leftFold + rightFold, topFold, extension,
                 (rightFold - leftFold) / 2,
                 totalHeight / 2 + topFold / 2,
-                extHalf);
+                extHalf, foldMaterial);
         }
         if (bottomFold > 0 && extension > 0) {
             addPanel(width + leftFold + rightFold, bottomFold, extension,
                 (rightFold - leftFold) / 2,
                 -totalHeight / 2 - bottomFold / 2,
-                extHalf);
+                extHalf, foldMaterial);
         }
         if (leftFold > 0 && extension > 0) {
             addPanel(leftFold, outerH, extension,
                 -width / 2 - leftFold / 2,
                 foldYOffset,
-                extHalf);
+                extHalf, foldMaterial);
         }
         if (rightFold > 0 && extension > 0) {
             addPanel(rightFold, outerH, extension,
                 width / 2 + rightFold / 2,
                 foldYOffset,
-                extHalf);
+                extHalf, foldMaterial);
         }
 
         // 2. 主体五面板（背、顶、底、左、右），正面开口
