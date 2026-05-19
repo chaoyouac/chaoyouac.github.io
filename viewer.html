@@ -73,13 +73,15 @@ function drawFace(pts,fillColor,strokeColor,lw,dashed){
 function drawHoleFill(projectFn,holesData){
   ctx.save();ctx.globalCompositeOperation='destination-out';
   holesData.forEach(function(hole){
-    if(hole.type==='slot'){
+    var holeType=hole.tp||hole.type;
+    var holeDiameter=hole.d||hole.diameter;
+    if(holeType==='slot'){
       var sl=45,sw=23;
       var p1=projectFn(hole.x-sl/2,0,hole.z-sw/2),p2=projectFn(hole.x+sl/2,0,hole.z-sw/2);
       var p3=projectFn(hole.x+sl/2,0,hole.z+sw/2),p4=projectFn(hole.x-sl/2,0,hole.z+sw/2);
       ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);ctx.closePath();ctx.fill();
     }else{
-      var r=hole.diameter/2;var segs=24;ctx.beginPath();
+      var r=holeDiameter/2;var segs=24;ctx.beginPath();
       for(var i=0;i<=segs;i++){var a=(i/segs)*Math.PI*2;var px=hole.x+r*Math.cos(a);var pz=hole.z+r*Math.sin(a);var pr=projectFn(px,0,pz);if(i===0)ctx.moveTo(pr.x,pr.y);else ctx.lineTo(pr.x,pr.y);}
       ctx.closePath();ctx.fill();
     }
@@ -91,14 +93,16 @@ function drawHoleStroke(projectFn,holesData,offset){
   var holeColors=['#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22'];
   holesData.forEach(function(hole,idx){
     var hc=holeColors[(idx+offset)%holeColors.length];
-    if(hole.type==='slot'){
+    var holeType=hole.tp||hole.type;
+    var holeDiameter=hole.d||hole.diameter;
+    if(holeType==='slot'){
       var sl=45,sw=23;
       var p1=projectFn(hole.x-sl/2,0,hole.z-sw/2),p2=projectFn(hole.x+sl/2,0,hole.z-sw/2);
       var p3=projectFn(hole.x+sl/2,0,hole.z+sw/2),p4=projectFn(hole.x-sl/2,0,hole.z+sw/2);
       ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);ctx.closePath();
       ctx.strokeStyle=hc;ctx.lineWidth=3;ctx.stroke();
     }else{
-      var r=hole.diameter/2;var segs=24;ctx.beginPath();
+      var r=holeDiameter/2;var segs=24;ctx.beginPath();
       for(var i=0;i<=segs;i++){var a=(i/segs)*Math.PI*2;var px=hole.x+r*Math.cos(a);var pz=hole.z+r*Math.sin(a);var pr=projectFn(px,0,pz);if(i===0)ctx.moveTo(pr.x,pr.y);else ctx.lineTo(pr.x,pr.y);}
       ctx.closePath();ctx.strokeStyle=hc;ctx.lineWidth=3;ctx.stroke();
     }
@@ -116,13 +120,14 @@ function draw(){
   if(!data)return;
   var w=window.innerWidth,h=window.innerHeight;
   ctx.clearRect(0,0,w,h);
-  if(data.type==='rect')drawRect();
-  else if(data.type==='lshape')drawLShape();
-  else if(data.type==='trench')drawTrench();
+  var viewType=data.t||data.type;
+  if(viewType==='rect')drawRect();
+  else if(viewType==='lshape')drawLShape();
+  else if(viewType==='trench')drawTrench();
 }
 
 function drawRect(){
-  var L=data.length,W=data.width,H=data.height,T=data.thickness;
+  var L=data.l,W=data.w,H=data.h,T=data.tk;
   var cx=L/2,cy=H/2,cz=W/2;
   var maxP=Math.sqrt(L*L+W*W+H*H);
   function proj(x,y,z){return project(x,y,z,cx,cy,cz,maxP);}
@@ -142,15 +147,15 @@ function drawRect(){
     innerFaces=[{pts:[I5,I6,I7,I8],c:'#85c1e9',b:'#5dade2',d:true}];
   }
   sortFaces(faces,innerFaces).forEach(function(f){drawFace(f.pts,f.c,f.b,f.d?1:1.5,f.d);});
-  if(data.holes&&data.holes.length>0){
-    drawHoleFill(proj,data.holes);
-    drawHoleStroke(proj,data.holes,0);
+  if(data.hs&&data.hs.length>0){
+    drawHoleFill(proj,data.hs);
+    drawHoleStroke(proj,data.hs,0);
   }
 }
 
 function drawLShape(){
-  var LL=data.longLength,LW=data.longWidth,SL=data.shortLength,SW=data.shortWidth,H=data.height;
-  var pos=data.position||'top-right';
+  var LL=data.ll,LW=data.lw,SL=data.sl,SW=data.sw,H=data.h;
+  var pos=data.p||'top-right';
   var TW=LL,TD=LW+SW;
   var cx=TW/2,cy=H/2,cz=TD/2;
   var maxP=Math.sqrt(TW*TW+TD*TD+H*H);
@@ -167,18 +172,18 @@ function drawLShape(){
   faces.forEach(function(f){f.z=f.pts.reduce(function(s,p){return s+p.z},0)/f.pts.length});
   faces.sort(function(a,b){return a.z-b.z});
   faces.forEach(function(f){drawFace(f.pts,f.c,f.b,2,false);});
-  if(data.holes&&data.holes.length>0){
-    drawHoleFill(proj,data.holes);
-    drawHoleStroke(proj,data.holes,0);
+  if(data.hs&&data.hs.length>0){
+    drawHoleFill(proj,data.hs);
+    drawHoleStroke(proj,data.hs,0);
   }
-  if(data.shortHoles&&data.shortHoles.length>0){
-    drawHoleFill(proj,data.shortHoles);
-    drawHoleStroke(proj,data.shortHoles,data.holes?data.holes.length:0);
+  if(data.sh&&data.sh.length>0){
+    drawHoleFill(proj,data.sh);
+    drawHoleStroke(proj,data.sh,data.hs?data.hs.length:0);
   }
 }
 
 function drawTrench(){
-  var L=data.length,W=data.width,H=data.height,T=data.thickness;
+  var L=data.l,W=data.w,H=data.h,T=data.tk;
   var IL=L-2*T,IW=W-2*T,IH=H-T;
   var hasInner=T>0&&IL>0&&IW>0&&IH>0;
   var cx=L/2,cy=H/2,cz=W/2;
@@ -212,27 +217,27 @@ canvas.addEventListener('touchend',function(e){if(e.touches.length<2)pinching=fa
 
 var infoHtml='<h2>地漏3D视图</h2>';
 if(data){
-  if(data.productInfo){
-    if(data.productInfo.number)infoHtml+='<div>编号：'+data.productInfo.number+'</div>';
-    if(data.productInfo.panelStyle)infoHtml+='<div>面盖款式：'+data.productInfo.panelStyle+'</div>';
+  if(data.i){
+    if(data.i.n)infoHtml+='<div>编号：'+data.i.n+'</div>';
+    if(data.i.s)infoHtml+='<div>面盖款式：'+data.i.s+'</div>';
   }
-  if(data.type==='rect'){
-    infoHtml+='<div>长度：'+data.length+' mm</div>';
-    infoHtml+='<div>宽度：'+data.width+' mm</div>';
-    infoHtml+='<div>高度：'+data.height+' mm</div>';
-    infoHtml+='<div>厚度：'+data.thickness+' mm</div>';
-  }else if(data.type==='lshape'){
-    infoHtml+='<div>长边长度：'+data.longLength+' mm</div>';
-    infoHtml+='<div>长边宽度：'+data.longWidth+' mm</div>';
-    infoHtml+='<div>短边长度：'+data.shortLength+' mm</div>';
-    infoHtml+='<div>短边宽度：'+data.shortWidth+' mm</div>';
-  }else if(data.type==='trench'){
-    infoHtml+='<div>长度：'+data.length+' mm</div>';
-    infoHtml+='<div>宽度：'+data.width+' mm</div>';
-    infoHtml+='<div>高度：'+data.height+' mm</div>';
-    infoHtml+='<div>厚度：'+data.thickness+' mm</div>';
-    if(data.thickness>0&&data.length-2*data.thickness>0&&data.width-2*data.thickness>0&&data.height-data.thickness>0){
-      infoHtml+='<div class="inner">内槽：'+(data.length-2*data.thickness)+'×'+(data.width-2*data.thickness)+'×'+(data.height-data.thickness)+' mm</div>';
+  if(data.t==='rect'){
+    infoHtml+='<div>长度：'+data.l+' mm</div>';
+    infoHtml+='<div>宽度：'+data.w+' mm</div>';
+    infoHtml+='<div>高度：'+data.h+' mm</div>';
+    infoHtml+='<div>厚度：'+data.tk+' mm</div>';
+  }else if(data.t==='lshape'){
+    infoHtml+='<div>长边长度：'+data.ll+' mm</div>';
+    infoHtml+='<div>长边宽度：'+data.lw+' mm</div>';
+    infoHtml+='<div>短边长度：'+data.sl+' mm</div>';
+    infoHtml+='<div>短边宽度：'+data.sw+' mm</div>';
+  }else if(data.t==='trench'){
+    infoHtml+='<div>长度：'+data.l+' mm</div>';
+    infoHtml+='<div>宽度：'+data.w+' mm</div>';
+    infoHtml+='<div>高度：'+data.h+' mm</div>';
+    infoHtml+='<div>厚度：'+data.tk+' mm</div>';
+    if(data.tk>0&&data.l-2*data.tk>0&&data.w-2*data.tk>0&&data.h-data.tk>0){
+      infoHtml+='<div class="inner">内槽：'+(data.l-2*data.tk)+'×'+(data.w-2*data.tk)+'×'+(data.h-data.tk)+' mm</div>';
     }
   }
 }
