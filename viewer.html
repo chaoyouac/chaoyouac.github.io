@@ -22,15 +22,47 @@ canvas{display:block;width:100vw;height:100vh}
 <div class="hint">单指拖拽旋转 · 双指缩放</div>
 <div class="info" id="info"></div>
 <script>
+function decodeFromBase64(base64){
+  var chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  var decoded=[];
+  var i=0;
+  base64=base64.replace(/[^A-Za-z0-9\+\/\=]/g,'');
+  while(i<base64.length){
+    var c1=chars.indexOf(base64.charAt(i++));
+    var c2=chars.indexOf(base64.charAt(i++));
+    var c3=chars.indexOf(base64.charAt(i++));
+    var c4=chars.indexOf(base64.charAt(i++));
+    var b1=(c1<<2)|(c2>>4);
+    var b2=((c2&15)<<4)|(c3>>2);
+    var b3=((c3&3)<<6)|c4;
+    decoded.push(b1);
+    if(c3!==64)decoded.push(b2);
+    if(c4!==64)decoded.push(b3);
+  }
+  return decoded;
+}
+
 function getData(){
   try{
-    var hash=decodeURIComponent(location.hash.slice(1));
+    var hash=location.hash.slice(1);
+    console.log('Raw hash:',hash);
     if(!hash)return null;
-    var json=decodeURIComponent(escape(atob(hash)));
-    return JSON.parse(json);
-  }catch(e){return null;}
+    var decodedHash=decodeURIComponent(hash);
+    console.log('Decoded hash:',decodedHash);
+    var byteArray=decodeFromBase64(decodedHash);
+    console.log('Byte array length:',byteArray.length);
+    var json=new TextDecoder('utf-8').decode(new Uint8Array(byteArray));
+    console.log('Parsed JSON:',json);
+    var result=JSON.parse(json);
+    console.log('Final data:',result);
+    return result;
+  }catch(e){
+    console.log('Data parse error:',e);
+    return null;
+  }
 }
 var data=getData();
+console.log('Parsed data:',data);
 if(!data){document.body.innerHTML='<div style="color:#fff;text-align:center;padding-top:40vh;font-size:18px;">参数错误或无参数<br>请通过正规渠道扫码访问</div>';}
 
 var rotX=-0.5,rotY=0.7,zoom=1;
