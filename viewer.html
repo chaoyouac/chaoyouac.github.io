@@ -26,7 +26,7 @@ canvas{display:block;width:100vw;height:100vh}
 <canvas id="c"></canvas>
 <button class="reset-btn" onclick="resetView()">重置视角</button>
 <div class="hint">左下角上下拖拽旋转模型 · 其他区域拖拽平移 · 双指缩放</div>
-<div class="version">测试2号</div>
+<div class="version">测试3号</div>
 <div class="info" id="info"></div>
 <div class="rotate-zone">旋转区 ↕</div>
 <script>
@@ -233,13 +233,20 @@ function sortFaces(faces,innerFaces){
 }
 
 function draw(){
-  if(!data)return;
   var w=window.innerWidth,h=window.innerHeight;
   ctx.clearRect(0,0,w,h);
-  var viewType=data.t;
-  if(viewType===0)drawRect();
-  else if(viewType===1)drawLShape();
-  else if(viewType===2)drawTrench();
+  // 测试1：画一个红色圆，验证canvas本身工作
+  ctx.beginPath();ctx.arc(w/2,h/2,40,0,Math.PI*2);ctx.fillStyle='#e74c3c';ctx.fill();
+  if(!data)return;
+  try{
+    var viewType=data.t;
+    if(viewType===0)drawRect();
+    else if(viewType===1)drawLShape();
+    else if(viewType===2)drawTrench();
+  }catch(e){
+    ctx.fillStyle='#fff';ctx.font='16px sans-serif';
+    ctx.fillText('DRAW ERROR: '+e.message,20,h/2);
+  }
 }
 
 function drawRect(){
@@ -365,7 +372,7 @@ if(rZone){
   rZone.addEventListener('touchmove',function(e){e.preventDefault();e.stopPropagation();},{passive:false});
 }
 
-var infoHtml='<h2>地漏3D视图 <span style=\"color:#e74c3c;font-size:11px;\">测试2号</span></h2>';
+var infoHtml='<h2>地漏3D视图 <span style=\"color:#e74c3c;font-size:11px;\">测试3号</span></h2>';
 if(data){
   if(data.pn){infoHtml+='<div>编号：'+data.pn+'</div>';}
   if(data.ps){infoHtml+='<div>面盖款式：'+data.ps+'</div>';}
