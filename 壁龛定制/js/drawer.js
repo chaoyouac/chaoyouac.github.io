@@ -150,9 +150,9 @@ const Drawer = (function() {
         const { depth, totalHeight, layers, layerThickness, extension,
                 topFold, bottomFold, layerHeights } = params;
 
-        // 侧面视图：外框高 = 总高度 + 上折边 + 下折边，宽 = 深度 + 延伸
-        const outerW = depth + extension;
         const outerH = totalHeight + topFold + bottomFold;
+        // 侧面总宽 = 折边厚度 + 内框深度
+        const totalW = extension + depth;
 
         const dpr = window.devicePixelRatio || 1;
         const logicalW = canvas.width / dpr;
@@ -161,9 +161,9 @@ const Drawer = (function() {
         const margin = 65;
         const availW = logicalW - margin * 2;
         const availH = logicalH - margin * 2;
-        const scale = Math.min(availW / outerW, availH / outerH) * 0.88;
+        const scale = Math.min(availW / totalW, availH / outerH) * 0.88;
 
-        const drawW = outerW * scale;
+        const drawW = totalW * scale;
         const drawH = outerH * scale;
         const startX = (logicalW - drawW) / 2;
         const startY = (logicalH - drawH) / 2;
@@ -172,15 +172,16 @@ const Drawer = (function() {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, logicalW, logicalH);
 
-        // 外框矩形
+        // 外框折边（正面折边，位于左侧）：宽 = extension，高 = outerH
+        const foldW = extension * scale;
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 2.5;
-        ctx.strokeRect(startX, startY, drawW, drawH);
+        ctx.strokeRect(startX, startY, foldW, drawH);
 
-        // 内框矩形（深度 × 总高度），与外框左侧对齐，顶部/底部缩进折边
+        // 内框（位于折边右侧）：宽 = depth，高 = totalHeight
         const innerW = depth * scale;
         const innerH = totalHeight * scale;
-        const innerX = startX;
+        const innerX = startX + foldW;
         const innerY = startY + topFold * scale;
 
         ctx.lineWidth = 2;
@@ -198,59 +199,32 @@ const Drawer = (function() {
             ctx.strokeRect(innerX, shelfY, innerW, layerThickness * scale);
         }
 
-        const extX = innerX + innerW + extension * scale;
-
-        // 外框延伸线（右侧，只画线条，不画完整矩形）
-        if (extension > 0) {
-            ctx.lineWidth = 2.5;
-            ctx.strokeStyle = '#000000';
-
-            // 右侧竖线（外框延伸）
+        // 折边延伸标注（画在折边顶部）
+        if (extension * scale > 10) {
+            ctx.fillStyle = '#e74c3c';
+            ctx.font = 'bold 16px Arial, sans-serif';
+            ctx.fillText(extension.toString(), startX + foldW / 2 - 5, startY + 20);
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 1.2;
             ctx.beginPath();
-            ctx.moveTo(extX, startY);
-            ctx.lineTo(extX, startY + drawH);
+            ctx.moveTo(startX, startY + 6);
+            ctx.lineTo(startX, startY + 32);
             ctx.stroke();
-
-            // 顶部横线连接
             ctx.beginPath();
-            ctx.moveTo(innerX + innerW, startY);
-            ctx.lineTo(extX, startY);
+            ctx.moveTo(startX + foldW, startY + 6);
+            ctx.lineTo(startX + foldW, startY + 32);
             ctx.stroke();
-
-            // 底部横线连接
             ctx.beginPath();
-            ctx.moveTo(innerX + innerW, startY + drawH);
-            ctx.lineTo(extX, startY + drawH);
+            ctx.moveTo(startX, startY + 19);
+            ctx.lineTo(startX + foldW, startY + 19);
             ctx.stroke();
-
-            // extension 标注
-            if (extension * scale > 10) {
-                ctx.fillStyle = '#e74c3c';
-                ctx.font = 'bold 16px Arial, sans-serif';
-                ctx.fillText(extension.toString(), innerX + innerW + (extension * scale) / 2 - 5, startY + 20);
-                ctx.strokeStyle = '#e74c3c';
-                ctx.lineWidth = 1.2;
-                ctx.beginPath();
-                ctx.moveTo(innerX + innerW, startY + 6);
-                ctx.lineTo(innerX + innerW, startY + 32);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(extX, startY + 6);
-                ctx.lineTo(extX, startY + 32);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(innerX + innerW, startY + 19);
-                ctx.lineTo(extX, startY + 19);
-                ctx.stroke();
-            }
         }
 
         // 尺寸标注
-        // 内高（左侧）
-        drawDimension(ctx, innerX, innerY, innerX, innerY + innerH, totalHeight.toString(), 42, 'left');
-        // 外高（右侧，以外框右边缘为基准）
-        const outerRightX = (extension > 0) ? extX : (innerX + innerW);
-        drawDimension(ctx, outerRightX, startY, outerRightX, startY + drawH, outerH.toString(), 22, 'right');
+        // 外高（左侧，以外框折边为基准）
+        drawDimension(ctx, startX, startY, startX, startY + drawH, outerH.toString(), 42, 'left');
+        // 内高（右侧，以内框右边缘为基准）
+        drawDimension(ctx, innerX + innerW, innerY, innerX + innerW, innerY + innerH, totalHeight.toString(), 22, 'right');
         // 深度（中间横向）
         const midY = innerY + innerH / 2;
         drawDimension(ctx, innerX, midY, innerX + innerW, midY, depth.toString(), 24, 'bottom');
