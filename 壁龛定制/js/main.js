@@ -29,24 +29,23 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.fold-separate').forEach(el => el.classList.toggle('hidden', isUniform));
     });
 
-    // 动态更新每层高度输入框
+    // 动态更新每层高度输入框 —— 层数或层板厚度变化时强制重新均分
     function updateLayerInputs() {
         const layers = parseInt(els.layers.value) || 1;
         const totalHeight = parseInt(els.totalHeight.value) || 880;
-        const currentInputs = els.layerInputs.querySelectorAll('input');
-        const currentValues = Array.from(currentInputs).map(i => parseInt(i.value));
+        const thickness = parseInt(els.layerThickness.value) || 10;
 
-        const avg = Math.floor(totalHeight / layers);
-        const defaultHeights = Array(layers).fill(avg);
+        const remaining = totalHeight - thickness * (layers - 1);
+        const avg = Math.floor(remaining / layers);
+        let heights = Array(layers).fill(avg);
         const sum = avg * layers;
-        defaultHeights[layers - 1] += totalHeight - sum;
+        heights[layers - 1] += remaining - sum;
 
         let html = '';
         for (let i = 0; i < layers; i++) {
-            const val = (currentValues[i] !== undefined && !isNaN(currentValues[i])) ? currentValues[i] : defaultHeights[i];
             html += `<div class="layer-input-group">
                 <label>第${i+1}层高度 (mm)</label>
-                <input type="number" class="layer-height-input" data-index="${i}" value="${val}" min="1">
+                <input type="number" class="layer-height-input" data-index="${i}" value="${heights[i]}" min="1">
             </div>`;
         }
         els.layerInputs.innerHTML = html;
@@ -92,7 +91,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const dpr = window.devicePixelRatio || 1;
         const parentW = els.combinedView.parentElement.clientWidth;
 
-        // 隐藏画布尺寸（离屏绘制用，稍大些保证清晰度）
         const offW = 480;
         const offH = Math.round(offW * 1.6);
 
@@ -111,7 +109,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const sctx = els.sideView.getContext('2d');
         sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        // 合成画布尺寸
         const combinedH = Math.round(parentW * 0.75);
         els.combinedView.style.width = parentW + 'px';
         els.combinedView.style.height = combinedH + 'px';
@@ -142,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateQRCode(params) {
         if (typeof QRCode === 'undefined') {
             console.error('QRCode library not loaded');
-            els.qrcode.innerHTML = '<p style="color:red;font-size:12px">二维码库加载失败</p>';
+            els.qrcode.innerHTML = '<p style="color:red;font-size:13px">二维码库未加载</p>';
             return;
         }
 
@@ -191,20 +188,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const ctx = composite.getContext('2d');
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        // 白底
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvasW, canvasH);
 
-        // 标题
         ctx.fillStyle = '#222222';
         ctx.font = 'bold 20px Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('壁龛定制工程图', canvasW / 2, 32);
 
-        // 合成视图
         ctx.drawImage(src, 0, 0, src.width, src.height, padding, titleH, srcW, srcH);
 
-        // 参数信息
         const outerW = params.width + params.leftFold + params.rightFold;
         const outerH = params.totalHeight + params.topFold + params.bottomFold;
         const infoY = titleH + srcH + 18;
@@ -219,7 +212,6 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.fillText(`层板厚度: ${params.layerThickness} mm`, padding + 260, infoY + 22);
         ctx.fillText(`外框延伸: ${params.extension} mm`, padding + 260, infoY + 44);
 
-        // 下载
         const link = document.createElement('a');
         link.download = `壁龛定制_${outerW}x${outerH}x${params.depth}.png`;
         link.href = composite.toDataURL('image/png');
@@ -229,7 +221,6 @@ document.addEventListener('DOMContentLoaded', function() {
     els.generateBtn.addEventListener('click', generate);
     els.exportBtn.addEventListener('click', exportViews);
 
-    // 初始化层高度输入并首次生成
     updateLayerInputs();
     setTimeout(generate, 100);
 });
