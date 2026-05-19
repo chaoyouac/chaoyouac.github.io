@@ -117,7 +117,7 @@ var data=getData();
 console.log('Parsed data:',data);
 if(!data){document.body.innerHTML='<div style="color:#fff;text-align:center;padding-top:40vh;font-size:18px;">参数错误或无参数<br>请通过正规渠道扫码访问</div>';}
 
-var BASE_ROTY=1.55, BASE_ROTX=1.55;
+var BASE_ROTY=0.0, BASE_ROTX=-0.4;
 var flipAngle=0,zoom=1;
 var targetX=0,targetY=0,targetZ=0;
 var panX=0,panY=0;
@@ -156,17 +156,18 @@ function baseRotate(x,y,z){
 function rotatePoint(x,y,z){
   var r=baseRotate(x,y,z);
   var cosF=Math.cos(flipAngle),sinF=Math.sin(flipAngle);
-  // 绕 Y 轴旋转 = 绕原始长度轴翻转（像轮子/烤肉串）
-  var rx2=r.x*cosF+r.z*sinF;
-  var rz2=-r.x*sinF+r.z*cosF;
-  return{x:rx2,y:r.y,z:rz2};
+  // 绕 X 轴旋转 = 像轮子/烤肉串绕自身长度轴翻转
+  var ry2=r.y*cosF-r.z*sinF;
+  var rz2=r.y*sinF+r.z*cosF;
+  return{x:r.x,y:ry2,z:rz2};
 }
 
 function project(x,y,z,maxP){
   var r=rotatePoint(x,y,z);
   var bs=Math.min(window.innerWidth,window.innerHeight)/(maxP*1.5);
   var s=bs*zoom;
-  return{x:window.innerWidth/2+r.x*s+panX,y:window.innerHeight/2-r.y*s+panY,z:r.z};
+  // 3D X(长度) -> 屏幕 Y(竖直)，3D Z(宽度) -> 屏幕 X(水平)
+  return{x:window.innerWidth/2+r.z*s+panX,y:window.innerHeight/2-r.x*s+panY,z:r.y};
 }
 
 function inRotateZone(x,y){
