@@ -106,7 +106,7 @@ const ThreeViewer = (function() {
         const maxDim = Math.max(outerW, outerH, depth);
         const distance = maxDim * 1.6;
         camera.position.set(distance * 0.6, distance * 0.5, distance);
-        camera.lookAt(0, 0, outerD / 2);
+        camera.lookAt(0, 0, depth / 2);
 
         setupControls(container, camera);
 
