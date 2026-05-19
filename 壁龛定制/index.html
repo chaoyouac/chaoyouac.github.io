@@ -6,7 +6,7 @@
     <title>壁龛定制</title>
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -62,6 +62,10 @@
                     <label>右折边 (mm)</label>
                     <input type="number" id="foldRight" value="10" min="0">
                 </div>
+                <div class="form-group">
+                    <label>外框延伸 (mm)</label>
+                    <input type="number" id="extension" value="5" min="0">
+                </div>
             </div>
             
             <div id="layerHeightsContainer" class="layer-heights">
@@ -76,14 +80,9 @@
         <section class="section views-section">
             <h2>工程视图</h2>
             <div class="views-wrapper">
-                <div class="view-box">
-                    <h3>正面视图</h3>
-                    <canvas id="frontView"></canvas>
-                </div>
-                <div class="view-box">
-                    <h3>侧面视图</h3>
-                    <canvas id="sideView"></canvas>
-                </div>
+                <canvas id="combinedView"></canvas>
+                <canvas id="frontView" style="display:none"></canvas>
+                <canvas id="sideView" style="display:none"></canvas>
             </div>
             <div id="qrcode-wrapper">
                 <p>扫码查看3D模型</p>
