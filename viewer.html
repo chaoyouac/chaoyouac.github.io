@@ -17,13 +17,15 @@ canvas{display:block;width:100vw;height:100vh}
 .hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);border-radius:20px;padding:8px 20px;font-size:12px;color:rgba(255,255,255,0.7);pointer-events:none;white-space:nowrap}
 .reset-btn{position:fixed;top:12px;right:12px;background:rgba(52,152,219,0.8);border:none;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;cursor:pointer;backdrop-filter:blur(8px)}
 .reset-btn:active{background:rgba(41,128,185,0.9)}
+.rotate-zone{position:fixed;bottom:16px;left:16px;width:100px;height:100px;background:rgba(52,152,219,0.25);border:2px solid rgba(52,152,219,0.6);border-radius:8px;z-index:10;pointer-events:none;display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(255,255,255,0.6);backdrop-filter:blur(4px)}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <button class="reset-btn" onclick="resetView()">重置视角</button>
-<div class="hint">单指拖拽旋转 · 双指缩放 · 双击以该位置为中心放大/还原</div>
+<div class="hint">左下角区域拖拽旋转 · 其他区域拖拽平移 · 双指缩放</div>
 <div class="info" id="info"></div>
+<div class="rotate-zone">旋转区</div>
 <script>
 function parseArrayData(arr){
   if(!arr||!Array.isArray(arr)||arr.length<5)return null;
@@ -116,16 +118,15 @@ if(!data){document.body.innerHTML='<div style="color:#fff;text-align:center;padd
 
 var rotX=-0.5,rotY=0.7,zoom=1;
 var panX=0,panY=0;
-var isZoomed=false;
-var dragging=false,lastX=0,lastY=0;
+var dragging=false,dragMode='pan',lastX=0,lastY=0;
 var pinching=false,lastDist=0;
-var lastTouchX=0,lastTouchY=0;
 var canvas=document.getElementById('c');
 var ctx=canvas.getContext('2d');
+var ROT_ZONE_W=100,ROT_ZONE_H=100,ROT_ZONE_PAD=16;
 
 function resize(){canvas.width=window.innerWidth*devicePixelRatio;canvas.height=window.innerHeight*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);draw();}
 window.addEventListener('resize',resize);
-function resetView(){rotX=-0.5;rotY=0.7;zoom=1;panX=0;panY=0;isZoomed=false;draw();}
+function resetView(){rotX=-0.5;rotY=0.7;zoom=1;panX=0;panY=0;draw();}
 
 function rotatePoint(x,y,z,cx,cy,cz){
   var px=x-cx,py=y-cy,pz=z-cz;
@@ -138,15 +139,16 @@ function rotatePoint(x,y,z,cx,cy,cz){
   return{x:px+cx,y:py+cy,z:pz+cz};
 }
 
-function project(x,y,z,cx,cy,cz,maxP,minDim){
+function project(x,y,z,cx,cy,cz,maxP){
   var r=rotatePoint(x,y,z,cx,cy,cz);
   var bs=Math.min(window.innerWidth,window.innerHeight)/(maxP*1.5);
-  if(minDim){
-    var minPx=Math.min(window.innerWidth,window.innerHeight)*0.12;
-    bs=Math.max(bs,minPx/minDim);
-  }
   var s=bs*zoom;
   return{x:window.innerWidth/2+(r.x-cx)*s+panX,y:window.innerHeight/2-(r.y-cy)*s+panY,z:r.z};
+}
+
+function inRotateZone(x,y){
+  return x>=ROT_ZONE_PAD && x<=ROT_ZONE_PAD+ROT_ZONE_W &&
+         y>=window.innerHeight-ROT_ZONE_PAD-ROT_ZONE_H && y<=window.innerHeight-ROT_ZONE_PAD;
 }
 
 function drawFace(pts,fillColor,strokeColor,lw,dashed){
@@ -218,8 +220,7 @@ function drawRect(){
   var L=data.l,W=data.w,H=data.h,T=data.tk;
   var cx=L/2,cy=H/2,cz=W/2;
   var maxP=Math.sqrt(L*L+W*W+H*H);
-  var minDim=Math.min(L,W,H);
-  function proj(x,y,z){return project(x,y,z,cx,cy,cz,maxP,minDim);}
+  function proj(x,y,z){return project(x,y,z,cx,cy,cz,maxP);}
   var A=proj(0,0,0),B=proj(L,0,0),C=proj(L,H,0),D=proj(0,H,0);
   var E=proj(0,0,W),F=proj(L,0,W),G=proj(L,H,W),Hp=proj(0,H,W);
   var faces=[
@@ -262,8 +263,7 @@ function drawLShape(){
   var TW=LL,TD=LW+SW;
   var cx=TW/2,cy=H/2,cz=TD/2;
   var maxP=Math.sqrt(TW*TW+TD*TD+H*H);
-  var minDim=Math.min(LL,LW,SL,SW,H);
-  function proj(x,y,z){return project(x,y,z,cx,cy,cz,maxP,minDim);}
+  function proj(x,y,z){return project(x,y,z,cx,cy,cz,maxP);}
   var tv,bv;
   if(pos==='top-right'){tv=[proj(0,H,SW),proj(LL-SL,H,SW),proj(LL-SL,H,0),proj(LL,H,0),proj(LL,H,LW+SW),proj(0,H,LW+SW)];bv=[proj(0,0,SW),proj(LL-SL,0,SW),proj(LL-SL,0,0),proj(LL,0,0),proj(LL,0,LW+SW),proj(0,0,LW+SW)];}
   else if(pos==='top-left'){tv=[proj(0,H,0),proj(SL,H,0),proj(SL,H,SW),proj(LL,H,SW),proj(LL,H,LW+SW),proj(0,H,LW+SW)];bv=[proj(0,0,0),proj(SL,0,0),proj(SL,0,SW),proj(LL,0,SW),proj(LL,0,LW+SW),proj(0,0,LW+SW)];}
@@ -292,8 +292,7 @@ function drawTrench(){
   var hasInner=T>0&&IL>0&&IW>0&&IH>0;
   var cx=L/2,cy=H/2,cz=W/2;
   var maxP=Math.sqrt(L*L+W*W+H*H);
-  var minDim=Math.min(L,W,H);
-  function proj(x,y,z){return project(x,y,z,cx,cy,cz,maxP,minDim);}
+  function proj(x,y,z){return project(x,y,z,cx,cy,cz,maxP);}
   var A=proj(0,0,0),B=proj(L,0,0),C=proj(L,H,0),D=proj(0,H,0);
   var E=proj(0,0,W),F=proj(L,0,W),G=proj(L,H,W),Hp=proj(0,H,W);
   var faces=[
@@ -311,60 +310,62 @@ function drawTrench(){
   sortFaces(faces,innerFaces).forEach(function(f){drawFace(f.pts,f.c,f.b,f.d?1:1.5,f.d);});
 }
 
-canvas.addEventListener('mousedown',function(e){dragging=true;lastX=e.clientX;lastY=e.clientY});
-canvas.addEventListener('mousemove',function(e){if(!dragging)return;rotY+=(e.clientX-lastX)*0.01;rotX+=(e.clientY-lastY)*0.01;rotX=Math.max(-1.0,Math.min(0.3,rotX));lastX=e.clientX;lastY=e.clientY;draw();});
+canvas.addEventListener('mousedown',function(e){
+  dragging=true;lastX=e.clientX;lastY=e.clientY;
+  dragMode=inRotateZone(e.clientX,e.clientY)?'rotate':'pan';
+});
+canvas.addEventListener('mousemove',function(e){
+  if(!dragging)return;
+  var dx=e.clientX-lastX,dy=e.clientY-lastY;
+  if(dragMode==='rotate'){
+    rotY+=dx*0.01;rotX+=dy*0.01;
+    rotX=Math.max(-1.0,Math.min(0.3,rotX));
+  }else{
+    panX+=dx;panY+=dy;
+  }
+  lastX=e.clientX;lastY=e.clientY;draw();
+});
 canvas.addEventListener('mouseup',function(){dragging=false});
 canvas.addEventListener('mouseleave',function(){dragging=false});
 canvas.addEventListener('wheel',function(e){e.preventDefault();zoom*=e.deltaY>0?0.9:1.1;zoom=Math.max(0.05,Math.min(20,zoom));draw();},{passive:false});
 
-var clickTimer=null;
-canvas.addEventListener('click',function(e){
-  if(clickTimer){
-    clearTimeout(clickTimer);
-    clickTimer=null;
-    var rect=canvas.getBoundingClientRect();
-    var cx=e.clientX-rect.left;
-    var cy=e.clientY-rect.top;
-    if(!isZoomed){
-      var factor=2.5;
-      panX+=(cx-window.innerWidth/2)*(1-factor);
-      panY+=(cy-window.innerHeight/2)*(1-factor);
-      zoom=Math.min(zoom*factor,20);
-      isZoomed=true;
-    }else{
-      panX=0;panY=0;zoom=1;isZoomed=false;
-    }
-    draw();
-  }else{
-    clickTimer=setTimeout(function(){clickTimer=null;},250);
+canvas.addEventListener('touchstart',function(e){
+  e.preventDefault();
+  if(e.touches.length===1){
+    dragging=true;pinching=false;
+    lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;
+    dragMode=inRotateZone(e.touches[0].clientX,e.touches[0].clientY)?'rotate':'pan';
+  }else if(e.touches.length===2){
+    dragging=false;pinching=true;
+    var dx=e.touches[0].clientX-e.touches[1].clientX;
+    var dy=e.touches[0].clientY-e.touches[1].clientY;
+    lastDist=Math.sqrt(dx*dx+dy*dy);
   }
-});
+},{passive:false});
 
-canvas.addEventListener('touchstart',function(e){e.preventDefault();if(e.touches.length===1){dragging=true;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;lastTouchX=e.touches[0].clientX;lastTouchY=e.touches[0].clientY}else if(e.touches.length===2){dragging=false;pinching=true;var dx=e.touches[0].clientX-e.touches[1].clientX;var dy=e.touches[0].clientY-e.touches[1].clientY;lastDist=Math.sqrt(dx*dx+dy*dy);}},{passive:false});
-canvas.addEventListener('touchmove',function(e){e.preventDefault();if(e.touches.length===1&&dragging){rotY+=(e.touches[0].clientX-lastX)*0.01;rotX+=(e.touches[0].clientY-lastY)*0.01;rotX=Math.max(-1.0,Math.min(0.3,rotX));lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;lastTouchX=e.touches[0].clientX;lastTouchY=e.touches[0].clientY;draw();}else if(e.touches.length===2&&pinching){var dx=e.touches[0].clientX-e.touches[1].clientX;var dy=e.touches[0].clientY-e.touches[1].clientY;var dist=Math.sqrt(dx*dx+dy*dy);zoom*=dist/lastDist;zoom=Math.max(0.05,Math.min(20,zoom));lastDist=dist;draw();}},{passive:false});
+canvas.addEventListener('touchmove',function(e){
+  e.preventDefault();
+  if(e.touches.length===1&&dragging){
+    var dx=e.touches[0].clientX-lastX,dy=e.touches[0].clientY-lastY;
+    if(dragMode==='rotate'){
+      rotY+=dx*0.01;rotX+=dy*0.01;
+      rotX=Math.max(-1.0,Math.min(0.3,rotX));
+    }else{
+      panX+=dx;panY+=dy;
+    }
+    lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;draw();
+  }else if(e.touches.length===2&&pinching){
+    var dx=e.touches[0].clientX-e.touches[1].clientX;
+    var dy=e.touches[0].clientY-e.touches[1].clientY;
+    var dist=Math.sqrt(dx*dx+dy*dy);
+    zoom*=dist/lastDist;zoom=Math.max(0.05,Math.min(20,zoom));lastDist=dist;draw();
+  }
+},{passive:false});
 
-var lastTouchTime=0;
 canvas.addEventListener('touchend',function(e){
   if(e.touches.length<2)pinching=false;
   if(e.touches.length===0)dragging=false;
-  var now=Date.now();
-  if(now-lastTouchTime<300){
-    var rect=canvas.getBoundingClientRect();
-    var cx=lastTouchX-rect.left;
-    var cy=lastTouchY-rect.top;
-    if(!isZoomed){
-      var factor=2.5;
-      panX+=(cx-window.innerWidth/2)*(1-factor);
-      panY+=(cy-window.innerHeight/2)*(1-factor);
-      zoom=Math.min(zoom*factor,20);
-      isZoomed=true;
-    }else{
-      panX=0;panY=0;zoom=1;isZoomed=false;
-    }
-    draw();
-  }
-  lastTouchTime=now;
-},true);
+},{passive:false});
 
 var infoHtml='<h2>地漏3D视图</h2>';
 if(data){
