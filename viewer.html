@@ -37,16 +37,19 @@ function parseArrayData(arr){
     data.tk=arr[idx++];
     while(idx<arr.length){
       var marker=arr[idx++];
-      if(marker===1){
+      if(marker===-1){
         data.sg=[];
-        while(idx<arr.length&&arr[idx]!==2&&arr[idx]!==3){
+        while(idx<arr.length&&arr[idx]!==-2&&arr[idx]!==-3&&arr[idx]!==-4){
           data.sg.push(arr[idx++]);
         }
-      }else if(marker===2){
+      }else if(marker===-2){
         data.hs=[];
-        while(idx+3<arr.length&&arr[idx]!==1&&arr[idx]!==3){
+        while(idx+3<arr.length&&arr[idx]!==-1&&arr[idx]!==-3&&arr[idx]!==-4){
           data.hs.push({x:arr[idx++],z:arr[idx++],tp:arr[idx++],d:arr[idx++]});
         }
+      }else if(marker===-4){
+        data.pn=arr[idx++]||'';
+        data.ps=arr[idx++]||'';
       }else{
         break;
       }
@@ -60,16 +63,19 @@ function parseArrayData(arr){
     data.p=arr[idx++];
     while(idx<arr.length){
       var marker=arr[idx++];
-      if(marker===2){
+      if(marker===-2){
         data.hs=[];
-        while(idx+3<arr.length&&arr[idx]!==3){
+        while(idx+3<arr.length&&arr[idx]!==-3&&arr[idx]!==-4){
           data.hs.push({x:arr[idx++],z:arr[idx++],tp:arr[idx++],d:arr[idx++]});
         }
-      }else if(marker===3){
+      }else if(marker===-3){
         data.sh=[];
-        while(idx+3<arr.length){
+        while(idx+3<arr.length&&arr[idx]!==-4){
           data.sh.push({x:arr[idx++],z:arr[idx++],tp:arr[idx++],d:arr[idx++]});
         }
+      }else if(marker===-4){
+        data.pn=arr[idx++]||'';
+        data.ps=arr[idx++]||'';
       }else{
         break;
       }
@@ -79,6 +85,7 @@ function parseArrayData(arr){
     data.w=arr[idx++];
     data.h=arr[idx++];
     data.tk=arr[idx++];
+    if(arr[idx]===-4){idx++;data.pn=arr[idx++]||'';data.ps=arr[idx++]||'';}
   }
   return data;
 }
@@ -88,8 +95,13 @@ function getData(){
     var hash=location.hash.slice(1);
     if(!hash)return null;
     var decodedHash=decodeURIComponent(hash);
-    var base64Decoded=atob(decodedHash);
-    var json=decodeURIComponent(escape(base64Decoded));
+    var bytes=[];
+    var raw=atob(decodedHash);
+    for(var i=0;i<raw.length;i++){
+      bytes.push(raw.charCodeAt(i));
+    }
+    var decoder=new TextDecoder('utf-8');
+    var json=decoder.decode(new Uint8Array(bytes));
     var arr=JSON.parse(json);
     if(!Array.isArray(arr))return null;
     return parseArrayData(arr);
@@ -339,6 +351,8 @@ canvas.addEventListener('touchend',function(e){
 
 var infoHtml='<h2>地漏3D视图</h2>';
 if(data){
+  if(data.pn){infoHtml+='<div>编号：'+data.pn+'</div>';}
+  if(data.ps){infoHtml+='<div>面盖款式：'+data.ps+'</div>';}
   if(data.t===0){
     infoHtml+='<div>类型：矩形地漏</div>';
     infoHtml+='<div>长度：'+data.l+' mm</div>';
@@ -349,6 +363,7 @@ if(data){
       infoHtml+='<div>分段：'+data.sg.join('+')+' mm</div>';
     }
   }else if(data.t===1){
+    infoHtml+='<div>类型：L型地漏</div>';
     infoHtml+='<div>长边长度：'+data.ll+' mm</div>';
     infoHtml+='<div>长边宽度：'+data.lw+' mm</div>';
     infoHtml+='<div>短边长度：'+data.sl+' mm</div>';
