@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
         depth: document.getElementById('depth'),
         layers: document.getElementById('layers'),
         layerThickness: document.getElementById('layerThickness'),
+        extension: document.getElementById('extension'),
         foldMode: document.getElementById('foldMode'),
         foldUniform: document.getElementById('foldUniform'),
         foldTop: document.getElementById('foldTop'),
@@ -16,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
         exportBtn: document.getElementById('exportBtn'),
         frontView: document.getElementById('frontView'),
         sideView: document.getElementById('sideView'),
+        combinedView: document.getElementById('combinedView'),
         qrcode: document.getElementById('qrcode'),
         threeContainer: document.getElementById('three-container')
     };
@@ -52,6 +54,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     els.layers.addEventListener('input', updateLayerInputs);
     els.totalHeight.addEventListener('input', updateLayerInputs);
+    els.layerThickness.addEventListener('input', updateLayerInputs);
 
     function getParams() {
         const layers = parseInt(els.layers.value) || 1;
@@ -75,6 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
             depth: parseInt(els.depth.value) || 250,
             layers: layers,
             layerThickness: parseInt(els.layerThickness.value) || 10,
+            extension: parseInt(els.extension.value) || 5,
             totalHeight: totalHeight,
             topFold: topFold,
             bottomFold: bottomFold,
@@ -85,28 +89,36 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function initCanvasSize() {
-        const front = els.frontView;
-        const side = els.sideView;
         const dpr = window.devicePixelRatio || 1;
-        const parentW = front.parentElement.clientWidth;
+        const parentW = els.combinedView.parentElement.clientWidth;
 
-        const targetW = Math.min(480, parentW);
-        const targetH = Math.round(targetW * 1.6);
+        // 隐藏画布尺寸（离屏绘制用，稍大些保证清晰度）
+        const offW = 480;
+        const offH = Math.round(offW * 1.6);
 
-        front.style.width = targetW + 'px';
-        front.style.height = targetH + 'px';
-        side.style.width = targetW + 'px';
-        side.style.height = targetH + 'px';
+        els.frontView.style.width = offW + 'px';
+        els.frontView.style.height = offH + 'px';
+        els.sideView.style.width = offW + 'px';
+        els.sideView.style.height = offH + 'px';
 
-        front.width = targetW * dpr;
-        front.height = targetH * dpr;
-        side.width = targetW * dpr;
-        side.height = targetH * dpr;
+        els.frontView.width = offW * dpr;
+        els.frontView.height = offH * dpr;
+        els.sideView.width = offW * dpr;
+        els.sideView.height = offH * dpr;
 
-        const fctx = front.getContext('2d');
+        const fctx = els.frontView.getContext('2d');
         fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const sctx = side.getContext('2d');
+        const sctx = els.sideView.getContext('2d');
         sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // 合成画布尺寸
+        const combinedH = Math.round(parentW * 0.75);
+        els.combinedView.style.width = parentW + 'px';
+        els.combinedView.style.height = combinedH + 'px';
+        els.combinedView.width = parentW * dpr;
+        els.combinedView.height = combinedH * dpr;
+        const cctx = els.combinedView.getContext('2d');
+        cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
     function generate() {
@@ -115,6 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         Drawer.drawFrontView(els.frontView, params);
         Drawer.drawSideView(els.sideView, params);
+        Drawer.drawCombinedView(els.combinedView, els.frontView, els.sideView);
 
         if (!window.threeInited) {
             ThreeViewer.init(els.threeContainer, params);
@@ -127,12 +140,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateQRCode(params) {
+        if (typeof QRCode === 'undefined') {
+            console.error('QRCode library not loaded');
+            els.qrcode.innerHTML = '<p style="color:red;font-size:12px">二维码库加载失败</p>';
+            return;
+        }
+
         const p = new URLSearchParams();
         p.set('h', params.totalHeight);
         p.set('w', params.width);
         p.set('d', params.depth);
         p.set('l', params.layers);
         p.set('t', params.layerThickness);
+        p.set('ext', params.extension);
         p.set('ft', params.topFold);
         p.set('fb', params.bottomFold);
         p.set('fl', params.leftFold);
@@ -155,19 +175,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function exportViews() {
         const params = getParams();
         const dpr = window.devicePixelRatio || 1;
-        const front = els.frontView;
-        const side = els.sideView;
-
-        const frontW = front.width / dpr;
-        const frontH = front.height / dpr;
-        const sideW = side.width / dpr;
-        const sideH = side.height / dpr;
+        const src = els.combinedView;
+        const srcW = src.width / dpr;
+        const srcH = src.height / dpr;
 
         const padding = 30;
-        const titleH = 40;
-        const infoH = 80;
-        const canvasW = frontW + sideW + padding * 3;
-        const canvasH = Math.max(frontH, sideH) + padding * 2 + titleH + infoH;
+        const titleH = 44;
+        const infoH = 100;
+        const canvasW = srcW + padding * 2;
+        const canvasH = srcH + padding * 2 + titleH + infoH;
 
         const composite = document.createElement('canvas');
         composite.width = Math.round(canvasW * dpr);
@@ -180,34 +196,28 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.fillRect(0, 0, canvasW, canvasH);
 
         // 标题
-        ctx.fillStyle = '#333333';
-        ctx.font = 'bold 18px Arial, sans-serif';
+        ctx.fillStyle = '#222222';
+        ctx.font = 'bold 20px Arial, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('壁龛定制工程图', canvasW / 2, 28);
+        ctx.fillText('壁龛定制工程图', canvasW / 2, 32);
 
-        // 视图标题
-        ctx.font = '12px Arial, sans-serif';
-        ctx.fillStyle = '#666666';
-        ctx.fillText('正面视图', padding + frontW / 2, titleH + 12);
-        ctx.fillText('侧面视图', padding * 2 + frontW + sideW / 2, titleH + 12);
-
-        // 绘制两个视图
-        ctx.drawImage(front, padding, titleH + 18, frontW, frontH);
-        ctx.drawImage(side, padding * 2 + frontW, titleH + 18, sideW, sideH);
+        // 合成视图
+        ctx.drawImage(src, 0, 0, src.width, src.height, padding, titleH, srcW, srcH);
 
         // 参数信息
         const outerW = params.width + params.leftFold + params.rightFold;
         const outerH = params.totalHeight + params.topFold + params.bottomFold;
-        const infoY = titleH + 18 + Math.max(frontH, sideH) + 16;
+        const infoY = titleH + srcH + 18;
 
         ctx.fillStyle = '#e74c3c';
-        ctx.font = '12px Arial, sans-serif';
+        ctx.font = 'bold 14px Arial, sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(`外径: ${outerW} x ${outerH} mm`, padding, infoY);
-        ctx.fillText(`内径: ${params.width} x ${params.totalHeight} mm`, padding, infoY + 18);
-        ctx.fillText(`深度: ${params.depth} mm`, padding, infoY + 36);
-        ctx.fillText(`层数: ${params.layers} 层`, padding + 220, infoY);
-        ctx.fillText(`层板厚度: ${params.layerThickness} mm`, padding + 220, infoY + 18);
+        ctx.fillText(`内径: ${params.width} x ${params.totalHeight} mm`, padding, infoY + 22);
+        ctx.fillText(`深度: ${params.depth} mm`, padding, infoY + 44);
+        ctx.fillText(`层数: ${params.layers} 层`, padding + 260, infoY);
+        ctx.fillText(`层板厚度: ${params.layerThickness} mm`, padding + 260, infoY + 22);
+        ctx.fillText(`外框延伸: ${params.extension} mm`, padding + 260, infoY + 44);
 
         // 下载
         const link = document.createElement('a');
