@@ -17,11 +17,10 @@ const ThreeViewer = (function() {
             const deltaX = x - previousPosition.x;
             const deltaY = y - previousPosition.y;
 
-            // 车轮式/滚筒式旋转：水平拖绕Y轴，垂直拖绕X轴
+            // 滚筒式/车轮式旋转：绕 Y 轴和 X 轴
             meshGroup.rotation.y += deltaX * 0.01;
             meshGroup.rotation.x += deltaY * 0.01;
 
-            // 限制俯仰角度
             meshGroup.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, meshGroup.rotation.x));
 
             previousPosition = { x, y };
@@ -138,45 +137,35 @@ const ThreeViewer = (function() {
             shininess: 50,
             side: THREE.DoubleSide
         });
-        const lineMaterial = new THREE.LineBasicMaterial({ color: 0x111111, linewidth: 1 });
 
-        // 辅助函数：创建板件并添加边框线
+        // 辅助函数：只创建实体板件，不添加线框
         function addPanel(w, h, d, x, y, z) {
             const geo = new THREE.BoxGeometry(w, h, d);
             const mesh = new THREE.Mesh(geo, material);
             mesh.position.set(x, y, z);
             meshGroup.add(mesh);
-
-            const edges = new THREE.EdgesGeometry(geo);
-            const line = new THREE.LineSegments(edges, lineMaterial);
-            line.position.set(x, y, z);
-            meshGroup.add(line);
         }
 
         // 1. 折边（正面四周，向后延伸 extension）
         const extHalf = extension / 2;
-        // 顶折边
         if (topFold > 0 && extension > 0) {
             addPanel(width + leftFold + rightFold, topFold, extension,
                 (rightFold - leftFold) / 2,
                 totalHeight / 2 + topFold / 2,
                 extHalf);
         }
-        // 底折边
         if (bottomFold > 0 && extension > 0) {
             addPanel(width + leftFold + rightFold, bottomFold, extension,
                 (rightFold - leftFold) / 2,
                 -totalHeight / 2 - bottomFold / 2,
                 extHalf);
         }
-        // 左折边
         if (leftFold > 0 && extension > 0) {
             addPanel(leftFold, totalHeight, extension,
                 -width / 2 - leftFold / 2,
                 0,
                 extHalf);
         }
-        // 右折边
         if (rightFold > 0 && extension > 0) {
             addPanel(rightFold, totalHeight, extension,
                 width / 2 + rightFold / 2,
@@ -214,15 +203,6 @@ const ThreeViewer = (function() {
             addPanel(width, layerThickness, depth,
                 0, currentY, bodyStartZ);
         }
-
-        // 网格地面
-        const outerW = width + leftFold + rightFold;
-        const outerH = totalHeight + topFold + bottomFold;
-        const outerD = depth + extension;
-        const gridSize = Math.max(outerW, outerD) * 2.5;
-        const gridHelper = new THREE.GridHelper(gridSize, 20, 0xbbbbbb, 0xdddddd);
-        gridHelper.position.y = -outerH / 2 - 30;
-        meshGroup.add(gridHelper);
 
         scene.add(meshGroup);
     }
