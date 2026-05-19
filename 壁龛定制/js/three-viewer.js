@@ -5,28 +5,24 @@ const ThreeViewer = (function() {
     function setupControls(container, camera) {
         let isDragging = false;
         let previousPosition = { x: 0, y: 0 };
-        let spherical = new THREE.Spherical();
-        spherical.setFromVector3(camera.position);
-
         let pinchStartDistance = 0;
-        let pinchStartRadius = 0;
 
         function onStart(x, y) {
             isDragging = true;
             previousPosition = { x, y };
-            spherical.setFromVector3(camera.position);
         }
 
         function onMove(x, y) {
-            if (!isDragging) return;
+            if (!isDragging || !meshGroup) return;
             const deltaX = x - previousPosition.x;
             const deltaY = y - previousPosition.y;
 
-            spherical.theta -= deltaX * 0.005;
-            spherical.phi += deltaY * 0.005;
-            spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-            camera.position.setFromSpherical(spherical);
-            camera.lookAt(0, 0, 0);
+            // 车轮式/滚筒式旋转：水平拖绕Y轴，垂直拖绕X轴
+            meshGroup.rotation.y += deltaX * 0.01;
+            meshGroup.rotation.x += deltaY * 0.01;
+
+            // 限制俯仰角度
+            meshGroup.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, meshGroup.rotation.x));
 
             previousPosition = { x, y };
         }
@@ -36,10 +32,9 @@ const ThreeViewer = (function() {
         }
 
         function onWheel(e) {
-            spherical.setFromVector3(camera.position);
-            const delta = e.deltaY * 0.5;
-            spherical.radius = Math.max(50, Math.min(3000, spherical.radius + delta));
-            camera.position.setFromSpherical(spherical);
+            const delta = e.deltaY * 0.8;
+            camera.position.z += delta;
+            camera.position.z = Math.max(100, Math.min(3000, camera.position.z));
         }
 
         container.addEventListener('mousedown', e => onStart(e.clientX, e.clientY));
@@ -56,7 +51,6 @@ const ThreeViewer = (function() {
                 const dx = e.touches[0].clientX - e.touches[1].clientX;
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 pinchStartDistance = Math.sqrt(dx * dx + dy * dy);
-                pinchStartRadius = spherical.radius;
             }
         }, { passive: false });
 
@@ -69,9 +63,10 @@ const ThreeViewer = (function() {
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (pinchStartDistance > 0) {
-                    const scale = pinchStartDistance / dist;
-                    spherical.radius = Math.max(50, Math.min(3000, pinchStartRadius * scale));
-                    camera.position.setFromSpherical(spherical);
+                    const scale = dist / pinchStartDistance;
+                    const targetZ = camera.position.z / scale;
+                    camera.position.z = Math.max(100, Math.min(3000, targetZ));
+                    pinchStartDistance = dist;
                 }
             }
         }, { passive: false });
@@ -95,24 +90,24 @@ const ThreeViewer = (function() {
         container.appendChild(renderer.domElement);
 
         // 灯光
-        const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+        const ambient = new THREE.AmbientLight(0xffffff, 0.65);
         scene.add(ambient);
         const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.7);
-        dirLight1.position.set(200, 400, 300);
+        dirLight1.position.set(300, 500, 400);
         scene.add(dirLight1);
         const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
-        dirLight2.position.set(-200, 200, -200);
+        dirLight2.position.set(-300, 200, -200);
         scene.add(dirLight2);
 
-        // 初始相机位置
-        const { width: pw, totalHeight, depth, topFold, bottomFold, leftFold, rightFold } = params;
+        // 相机固定位置
+        const { width: pw, totalHeight, depth, topFold, bottomFold, leftFold, rightFold, extension } = params;
         const outerW = pw + leftFold + rightFold;
         const outerH = totalHeight + topFold + bottomFold;
-        const outerD = depth + 5;
+        const outerD = depth + extension;
         const maxDim = Math.max(outerW, outerH, outerD);
-        const distance = maxDim * 1.4;
-        camera.position.set(distance * 0.7, distance * 1.0, distance * 0.8);
-        camera.lookAt(0, 0, 0);
+        const distance = maxDim * 1.6;
+        camera.position.set(distance * 0.6, distance * 0.5, distance);
+        camera.lookAt(0, 0, outerD / 2);
 
         setupControls(container, camera);
 
@@ -135,69 +130,98 @@ const ThreeViewer = (function() {
         }
         meshGroup = new THREE.Group();
 
-        const { width, totalHeight, depth, layers, layerThickness,
+        const { width, totalHeight, depth, layers, layerThickness, extension,
                 topFold, bottomFold, leftFold, rightFold, layerHeights } = params;
-
-        const outerW = width + leftFold + rightFold;
-        const outerH = totalHeight + topFold + bottomFold;
-        const outerD = depth + 5;
-
-        const xOffset = (rightFold - leftFold) / 2;
-        const yOffset = (bottomFold - topFold) / 2;
 
         const material = new THREE.MeshPhongMaterial({
             color: 0x2c2c2c,
-            shininess: 40,
+            shininess: 50,
             side: THREE.DoubleSide
         });
-
         const lineMaterial = new THREE.LineBasicMaterial({ color: 0x111111, linewidth: 1 });
-        const redLineMaterial = new THREE.LineBasicMaterial({ color: 0xe74c3c, linewidth: 1 });
 
-        // 外框线框
-        const outerGeo = new THREE.BoxGeometry(outerW, outerH, outerD);
-        const outerEdges = new THREE.EdgesGeometry(outerGeo);
-        const outerLine = new THREE.LineSegments(outerEdges, lineMaterial);
-        outerLine.position.set(0, 0, -2.5);
-        meshGroup.add(outerLine);
+        // 辅助函数：创建板件并添加边框线
+        function addPanel(w, h, d, x, y, z) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mesh = new THREE.Mesh(geo, material);
+            mesh.position.set(x, y, z);
+            meshGroup.add(mesh);
 
-        // 外框半透明面
-        const outerFaceMat = new THREE.MeshBasicMaterial({
-            color: 0xdddddd,
-            transparent: true,
-            opacity: 0.12,
-            side: THREE.BackSide,
-            depthWrite: false
-        });
-        const outerMesh = new THREE.Mesh(outerGeo, outerFaceMat);
-        outerMesh.position.set(0, 0, -2.5);
-        meshGroup.add(outerMesh);
+            const edges = new THREE.EdgesGeometry(geo);
+            const line = new THREE.LineSegments(edges, lineMaterial);
+            line.position.set(x, y, z);
+            meshGroup.add(line);
+        }
 
-        // 内框线框
-        const innerGeo = new THREE.BoxGeometry(width, totalHeight, depth);
-        const innerEdges = new THREE.EdgesGeometry(innerGeo);
-        const innerLine = new THREE.LineSegments(innerEdges, redLineMaterial);
-        innerLine.position.set(xOffset, yOffset, 0);
-        meshGroup.add(innerLine);
+        // 1. 折边（正面四周，向后延伸 extension）
+        const extHalf = extension / 2;
+        // 顶折边
+        if (topFold > 0 && extension > 0) {
+            addPanel(width + leftFold + rightFold, topFold, extension,
+                (rightFold - leftFold) / 2,
+                totalHeight / 2 + topFold / 2,
+                extHalf);
+        }
+        // 底折边
+        if (bottomFold > 0 && extension > 0) {
+            addPanel(width + leftFold + rightFold, bottomFold, extension,
+                (rightFold - leftFold) / 2,
+                -totalHeight / 2 - bottomFold / 2,
+                extHalf);
+        }
+        // 左折边
+        if (leftFold > 0 && extension > 0) {
+            addPanel(leftFold, totalHeight, extension,
+                -width / 2 - leftFold / 2,
+                0,
+                extHalf);
+        }
+        // 右折边
+        if (rightFold > 0 && extension > 0) {
+            addPanel(rightFold, totalHeight, extension,
+                width / 2 + rightFold / 2,
+                0,
+                extHalf);
+        }
 
-        // 层板
-        let currentY = yOffset - totalHeight / 2;
+        // 2. 主体五面板（背、顶、底、左、右），正面开口
+        const bodyStartZ = extension + depth / 2;
+
+        // 背板
+        addPanel(width, totalHeight, layerThickness,
+            0, 0, extension + depth - layerThickness / 2);
+
+        // 顶板
+        addPanel(width, layerThickness, depth,
+            0, totalHeight / 2 - layerThickness / 2, bodyStartZ);
+
+        // 底板
+        addPanel(width, layerThickness, depth,
+            0, -totalHeight / 2 + layerThickness / 2, bodyStartZ);
+
+        // 左侧板
+        addPanel(layerThickness, totalHeight, depth,
+            -width / 2 + layerThickness / 2, 0, bodyStartZ);
+
+        // 右侧板
+        addPanel(layerThickness, totalHeight, depth,
+            width / 2 - layerThickness / 2, 0, bodyStartZ);
+
+        // 3. 层板
+        let currentY = -totalHeight / 2;
         for (let i = 0; i < layers - 1; i++) {
             currentY += layerHeights[i];
-            const shelfGeo = new THREE.BoxGeometry(width, layerThickness, depth);
-            const shelfMesh = new THREE.Mesh(shelfGeo, material);
-            shelfMesh.position.set(xOffset, currentY, 0);
-            meshGroup.add(shelfMesh);
-
-            const shelfEdges = new THREE.EdgesGeometry(shelfGeo);
-            const shelfLine = new THREE.LineSegments(shelfEdges, lineMaterial);
-            shelfLine.position.set(xOffset, currentY, 0);
-            meshGroup.add(shelfLine);
+            addPanel(width, layerThickness, depth,
+                0, currentY, bodyStartZ);
         }
 
         // 网格地面
-        const gridHelper = new THREE.GridHelper(Math.max(outerW, outerD) * 2, 20, 0xcccccc, 0xe5e5e5);
-        gridHelper.position.y = -outerH / 2 - 20;
+        const outerW = width + leftFold + rightFold;
+        const outerH = totalHeight + topFold + bottomFold;
+        const outerD = depth + extension;
+        const gridSize = Math.max(outerW, outerD) * 2.5;
+        const gridHelper = new THREE.GridHelper(gridSize, 20, 0xbbbbbb, 0xdddddd);
+        gridHelper.position.y = -outerH / 2 - 30;
         meshGroup.add(gridHelper);
 
         scene.add(meshGroup);
