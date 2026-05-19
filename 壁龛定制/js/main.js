@@ -149,14 +149,15 @@ document.addEventListener('DOMContentLoaded', function() {
         p.set('d', params.depth);
         p.set('l', params.layers);
         p.set('t', params.layerThickness);
-        p.set('ext', params.extension);
+        p.set('e', params.extension);
         p.set('ft', params.topFold);
         p.set('fb', params.bottomFold);
         p.set('fl', params.leftFold);
         p.set('fr', params.rightFold);
-        p.set('lh', params.layerHeights.join(','));
+        // 不携带每层高度，viewer.html 自行均分，以缩短 URL 避免二维码溢出
 
         const url = `https://chaoyouac.github.io/壁龛定制/viewer.html?${p.toString()}`;
+        console.log('QR URL length:', url.length);
 
         els.qrcode.innerHTML = '';
         try {
@@ -166,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 height: 128,
                 colorDark: '#000000',
                 colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.M
+                correctLevel: QRCode.CorrectLevel.H
             });
             console.log('QRCode generated successfully');
         } catch (e) {
