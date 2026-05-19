@@ -180,34 +180,35 @@ const ThreeViewer = (function() {
         }
 
         // 2. 主体五面板（背、顶、底、左、右），正面开口
-        const bodyStartZ = extension + bodyDepth / 2;
+        // 主体面板正面与折边正面齐平（都在 Z=0），向后延伸 bodyDepth
+        const bodyCenterZ = bodyDepth / 2;
 
         // 背板
         addPanel(width, totalHeight, layerThickness,
-            0, 0, extension + bodyDepth - layerThickness / 2);
+            0, 0, bodyDepth - layerThickness / 2);
 
         // 顶板
         addPanel(width, layerThickness, bodyDepth,
-            0, totalHeight / 2 - layerThickness / 2, bodyStartZ);
+            0, totalHeight / 2 - layerThickness / 2, bodyCenterZ);
 
         // 底板
         addPanel(width, layerThickness, bodyDepth,
-            0, -totalHeight / 2 + layerThickness / 2, bodyStartZ);
+            0, -totalHeight / 2 + layerThickness / 2, bodyCenterZ);
 
         // 左侧板
         addPanel(layerThickness, totalHeight, bodyDepth,
-            -width / 2 + layerThickness / 2, 0, bodyStartZ);
+            -width / 2 + layerThickness / 2, 0, bodyCenterZ);
 
         // 右侧板
         addPanel(layerThickness, totalHeight, bodyDepth,
-            width / 2 - layerThickness / 2, 0, bodyStartZ);
+            width / 2 - layerThickness / 2, 0, bodyCenterZ);
 
         // 3. 层板
         let currentY = -totalHeight / 2;
         for (let i = 0; i < layers - 1; i++) {
             currentY += layerHeights[i];
             addPanel(width, layerThickness, bodyDepth,
-                0, currentY, bodyStartZ);
+                0, currentY, bodyCenterZ);
         }
 
         scene.add(meshGroup);
