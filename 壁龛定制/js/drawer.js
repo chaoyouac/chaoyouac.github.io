@@ -198,9 +198,10 @@ const Drawer = (function() {
             ctx.strokeRect(innerX, shelfY, innerW, layerThickness * scale);
         }
 
+        const extX = innerX + innerW + extension * scale;
+
         // 外框延伸线（右侧，只画线条，不画完整矩形）
         if (extension > 0) {
-            const extX = innerX + innerW + extension * scale;
             ctx.lineWidth = 2.5;
             ctx.strokeStyle = '#000000';
 
@@ -247,8 +248,9 @@ const Drawer = (function() {
         // 尺寸标注
         // 内高（左侧）
         drawDimension(ctx, innerX, innerY, innerX, innerY + innerH, totalHeight.toString(), 42, 'left');
-        // 外高（右侧）
-        drawDimension(ctx, innerX + innerW, startY, innerX + innerW, startY + drawH, outerH.toString(), 22, 'right');
+        // 外高（右侧，以外框右边缘为基准）
+        const outerRightX = (extension > 0) ? extX : (innerX + innerW);
+        drawDimension(ctx, outerRightX, startY, outerRightX, startY + drawH, outerH.toString(), 22, 'right');
         // 深度（中间横向）
         const midY = innerY + innerH / 2;
         drawDimension(ctx, innerX, midY, innerX + innerW, midY, depth.toString(), 24, 'bottom');
