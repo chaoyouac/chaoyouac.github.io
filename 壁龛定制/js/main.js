@@ -22,14 +22,12 @@ document.addEventListener('DOMContentLoaded', function() {
         threeContainer: document.getElementById('three-container')
     };
 
-    // 折边模式切换
     els.foldMode.addEventListener('change', function() {
         const isUniform = this.value === 'uniform';
         document.querySelectorAll('.fold-uniform').forEach(el => el.classList.toggle('hidden', !isUniform));
         document.querySelectorAll('.fold-separate').forEach(el => el.classList.toggle('hidden', isUniform));
     });
 
-    // 动态更新每层高度输入框 —— 层数或层板厚度变化时强制重新均分
     function updateLayerInputs() {
         const layers = parseInt(els.layers.value) || 1;
         const totalHeight = parseInt(els.totalHeight.value) || 880;
@@ -139,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateQRCode(params) {
         if (typeof QRCode === 'undefined') {
             console.error('QRCode library not loaded');
-            els.qrcode.innerHTML = '<p style="color:red;font-size:13px">二维码库未加载</p>';
+            els.qrcode.innerHTML = '<p style="color:red;font-size:13px">二维码库未加载，请检查 js/qrcode.min.js 是否存在</p>';
             return;
         }
 
@@ -154,10 +152,9 @@ document.addEventListener('DOMContentLoaded', function() {
         p.set('fb', params.bottomFold);
         p.set('fl', params.leftFold);
         p.set('fr', params.rightFold);
-        // 不携带每层高度，viewer.html 自行均分，以缩短 URL 避免二维码溢出
 
         const url = `https://chaoyouac.github.io/壁龛定制/viewer.html?${p.toString()}`;
-        console.log('QR URL length:', url.length);
+        console.log('QR URL:', url, 'Length:', url.length);
 
         els.qrcode.innerHTML = '';
         try {
@@ -167,9 +164,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 height: 128,
                 colorDark: '#000000',
                 colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.H
+                correctLevel: QRCode.CorrectLevel.L
             });
-            console.log('QRCode generated successfully');
+            console.log('QRCode generated OK');
         } catch (e) {
             console.error('QRCode generation failed:', e);
             els.qrcode.innerHTML = '<p style="color:#e74c3c;font-size:13px">二维码生成失败，请刷新重试</p>';
