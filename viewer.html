@@ -26,7 +26,7 @@ canvas{display:block;width:100vw;height:100vh}
 <canvas id="c"></canvas>
 <button class="reset-btn" onclick="resetView()">重置视角</button>
 <div class="hint">左下角上下拖拽旋转模型 · 其他区域拖拽平移 · 双指缩放</div>
-<div class="version">测试10号</div>
+<div class="version">测试11号</div>
 <div class="info" id="info"></div>
 <div class="rotate-zone">旋转区 ↕</div>
 <script>
@@ -167,24 +167,19 @@ function sortAndDraw(faces){
 }
 
 function drawHole(projectFn,hole,offset){
-  var colors=['#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22'];
-  var hc=colors[(offset)%colors.length];
   ctx.save();
+  ctx.fillStyle='rgba(0,0,0,0.35)';
   if(hole.tp===1){
     var sl=45,sw=23;
     var p1=projectFn(hole.x-sl/2,0,hole.z-sw/2);
     var p2=projectFn(hole.x+sl/2,0,hole.z-sw/2);
     var p3=projectFn(hole.x+sl/2,0,hole.z+sw/2);
     var p4=projectFn(hole.x-sl/2,0,hole.z+sw/2);
-    ctx.fillStyle='rgba(0,0,0,0.35)';
-    ctx.strokeStyle=hc;ctx.lineWidth=2.5;
     ctx.beginPath();
     ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);
-    ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.closePath();ctx.fill();
   }else{
     var r=hole.d/2,segs=24;
-    ctx.fillStyle='rgba(0,0,0,0.35)';
-    ctx.strokeStyle=hc;ctx.lineWidth=2.5;
     ctx.beginPath();
     for(var i=0;i<segs;i++){
       var a=(i/segs)*Math.PI*2;
@@ -194,7 +189,7 @@ function drawHole(projectFn,hole,offset){
       if(i===0)ctx.moveTo(pt.x,pt.y);
       else ctx.lineTo(pt.x,pt.y);
     }
-    ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.closePath();ctx.fill();
   }
   ctx.restore();
 }
@@ -373,7 +368,7 @@ if(rZone){
 }
 
 // 信息面板
-var infoHtml='<h2>地漏3D视图 <span style=\"color:#e74c3c;font-size:11px;\">测试10号</span></h2>';
+var infoHtml='<h2>地漏3D视图 <span style=\"color:#e74c3c;font-size:11px;\">测试11号</span></h2>';
 if(data){
   if(data.pn){infoHtml+='<div>编号：'+data.pn+'</div>';}
   if(data.ps){infoHtml+='<div>面盖款式：'+data.ps+'</div>';}
