@@ -26,7 +26,7 @@ canvas{display:block;width:100vw;height:100vh}
 <canvas id="c"></canvas>
 <button class="reset-btn" onclick="resetView()">重置视角</button>
 <div class="hint">左下角上下拖拽旋转模型 · 其他区域拖拽平移 · 双指缩放</div>
-<div class="version">测试3号</div>
+<div class="version">测试4号</div>
 <div class="info" id="info"></div>
 <div class="rotate-zone">旋转区 ↕</div>
 <script>
@@ -36,36 +36,23 @@ function parseArrayData(arr){
   var data={t:type};
   var idx=1;
   if(type===0){
-    data.l=arr[idx++];
-    data.w=arr[idx++];
-    data.h=arr[idx++];
-    data.tk=arr[idx++];
+    data.l=arr[idx++];data.w=arr[idx++];data.h=arr[idx++];data.tk=arr[idx++];
     while(idx<arr.length){
       var marker=arr[idx++];
       if(marker===-1){
         data.sg=[];
-        while(idx<arr.length&&arr[idx]!==-2&&arr[idx]!==-3&&arr[idx]!==-4){
-          data.sg.push(arr[idx++]);
-        }
+        while(idx<arr.length&&arr[idx]!==-2&&arr[idx]!==-3&&arr[idx]!==-4){data.sg.push(arr[idx++]);}
       }else if(marker===-2){
         data.hs=[];
         while(idx+3<arr.length&&arr[idx]!==-1&&arr[idx]!==-3&&arr[idx]!==-4){
           data.hs.push({x:arr[idx++],z:arr[idx++],tp:arr[idx++],d:arr[idx++]});
         }
       }else if(marker===-4){
-        data.pn=arr[idx++]||'';
-        data.ps=arr[idx++]||'';
-      }else{
-        break;
-      }
+        data.pn=arr[idx++]||'';data.ps=arr[idx++]||'';
+      }else{break;}
     }
   }else if(type===1){
-    data.ll=arr[idx++];
-    data.lw=arr[idx++];
-    data.sl=arr[idx++];
-    data.sw=arr[idx++];
-    data.h=arr[idx++];
-    data.p=arr[idx++];
+    data.ll=arr[idx++];data.lw=arr[idx++];data.sl=arr[idx++];data.sw=arr[idx++];data.h=arr[idx++];data.p=arr[idx++];
     while(idx<arr.length){
       var marker=arr[idx++];
       if(marker===-2){
@@ -79,211 +66,176 @@ function parseArrayData(arr){
           data.sh.push({x:arr[idx++],z:arr[idx++],tp:arr[idx++],d:arr[idx++]});
         }
       }else if(marker===-4){
-        data.pn=arr[idx++]||'';
-        data.ps=arr[idx++]||'';
-      }else{
-        break;
-      }
+        data.pn=arr[idx++]||'';data.ps=arr[idx++]||'';
+      }else{break;}
     }
   }else if(type===2){
-    data.l=arr[idx++];
-    data.w=arr[idx++];
-    data.h=arr[idx++];
-    data.tk=arr[idx++];
+    data.l=arr[idx++];data.w=arr[idx++];data.h=arr[idx++];data.tk=arr[idx++];
     if(arr[idx]===-4){idx++;data.pn=arr[idx++]||'';data.ps=arr[idx++]||'';}
   }
   return data;
 }
-
 function getData(){
   try{
     var hash=location.hash.slice(1);
     if(!hash)return null;
     var decodedHash=decodeURIComponent(hash);
-    var bytes=[];
-    var raw=atob(decodedHash);
-    for(var i=0;i<raw.length;i++){
-      bytes.push(raw.charCodeAt(i));
-    }
+    var bytes=[];var raw=atob(decodedHash);
+    for(var i=0;i<raw.length;i++){bytes.push(raw.charCodeAt(i));}
     var decoder=new TextDecoder('utf-8');
     var json=decoder.decode(new Uint8Array(bytes));
     var arr=JSON.parse(json);
     if(!Array.isArray(arr))return null;
     return parseArrayData(arr);
-  }catch(e){
-    console.log('Data parse error:',e);
-    return null;
-  }
+  }catch(e){console.log('Data parse error:',e);return null;}
 }
 var data=getData();
 console.log('Parsed data:',data);
 if(!data){document.body.innerHTML='<div style="color:#fff;text-align:center;padding-top:40vh;font-size:18px;">参数错误或无参数<br>请通过正规渠道扫码访问</div>';}
 
-var BASE_ROTY=0.0, BASE_ROTX=-0.4;
+// ====== 3D 引擎核心 ======
 var flipAngle=0,zoom=1;
-var targetX=0,targetY=0,targetZ=0;
 var panX=0,panY=0;
 var dragging=false,dragMode='pan',lastX=0,lastY=0;
 var pinching=false,lastDist=0;
 var canvas=document.getElementById('c');
 var ctx=canvas.getContext('2d');
 var ROT_ZONE_W=100,ROT_ZONE_H=100,ROT_ZONE_PAD=16;
+var VIEW_TILT=0.25; // 固定轻微倾斜，产生3D感
 
-function resize(){canvas.width=window.innerWidth*devicePixelRatio;canvas.height=window.innerHeight*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);draw();}
+function resize(){
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
+  draw();
+}
 window.addEventListener('resize',resize);
-function resetTarget(){
-  if(!data)return;
-  if(data.t===0){
-    targetX=data.l/2;targetY=data.h/2;targetZ=data.w/2;
-  }else if(data.t===1){
-    var TW=data.ll,TD=data.lw+data.sw;
-    targetX=TW/2;targetY=data.h/2;targetZ=TD/2;
-  }else if(data.t===2){
-    targetX=data.l/2;targetY=data.h/2;targetZ=data.w/2;
-  }
-}
-function resetView(){flipAngle=0;zoom=1;panX=0;panY=0;resetTarget();draw();}
 
-function baseRotate(x,y,z){
-  var px=x-targetX,py=y-targetY,pz=z-targetZ;
-  var cosY=Math.cos(BASE_ROTY),sinY=Math.sin(BASE_ROTY);
-  var rx=px*cosY+pz*sinY,rz=-px*sinY+pz*cosY;
-  px=rx;pz=rz;
-  var cosX=Math.cos(BASE_ROTX),sinX=Math.sin(BASE_ROTX);
-  var ry=py*cosX-pz*sinX,rz2=py*sinX+pz*cosX;
-  py=ry;pz=rz2;
-  return{x:px,y:py,z:pz};
-}
+function resetView(){flipAngle=0;zoom=1;panX=0;panY=0;draw();}
 
-function rotatePoint(x,y,z){
-  var r=baseRotate(x,y,z);
-  var cosF=Math.cos(flipAngle),sinF=Math.sin(flipAngle);
-  // 绕 X 轴旋转 = 像轮子/烤肉串绕自身长度轴翻转
-  var ry2=r.y*cosF-r.z*sinF;
-  var rz2=r.y*sinF+r.z*cosF;
-  return{x:r.x,y:ry2,z:rz2};
-}
-
-function project(x,y,z,maxP){
-  var r=rotatePoint(x,y,z);
-  var bs=Math.min(window.innerWidth,window.innerHeight)/(maxP*1.5);
-  var s=bs*zoom;
-  // 3D X(长度) -> 屏幕 Y(竖直)，3D Z(宽度) -> 屏幕 X(水平)
-  return{x:window.innerWidth/2+r.z*s+panX,y:window.innerHeight/2-r.x*s+panY,z:r.y};
+// 投影：3D坐标 → 2D屏幕坐标
+// 坐标系：X=长度(竖直), Y=高度(厚度), Z=宽度(水平)
+// 翻转：绕X轴旋转flipAngle（像轮子/烤肉串翻面）
+function project(x,y,z,cx,cy,cz){
+  // 1. 中心偏移
+  var px=x-cx,py=y-cy,pz=z-cz;
+  // 2. 用户翻转（绕X轴）
+  var fy=py*Math.cos(flipAngle)-pz*Math.sin(flipAngle);
+  var fz=py*Math.sin(flipAngle)+pz*Math.cos(flipAngle);
+  // 3. 固定倾斜（绕Z轴轻微旋转，让模型有立体感）
+  var vx=px*Math.cos(VIEW_TILT)-fy*Math.sin(VIEW_TILT);
+  var vy=px*Math.sin(VIEW_TILT)+fy*Math.cos(VIEW_TILT);
+  var vz=fz;
+  // 4. 缩放：按最大尺寸适配屏幕，同时保护最小维度不低于12%
+  var dimX=Math.abs(x-cx)*2;var dimY=Math.abs(y-cy)*2;var dimZ=Math.abs(z-cz)*2;
+  var maxDim=Math.max(dimX,dimY,dimZ);
+  var minDim=Math.min(dimX,dimY,dimZ);
+  var bs=Math.min(canvas.width,canvas.height)/(maxDim*1.8);
+  var minScale=Math.min(canvas.width,canvas.height)*0.12/minDim;
+  var s=Math.max(bs,minScale)*zoom;
+  // 5. 输出：X→屏幕Y(竖直), Z→屏幕X(水平), Y→深度
+  return{
+    x:canvas.width/2+vz*s+panX,
+    y:canvas.height/2-vx*s+panY,
+    z:vy
+  };
 }
 
 function inRotateZone(x,y){
   return x>=ROT_ZONE_PAD && x<=ROT_ZONE_PAD+ROT_ZONE_W &&
-         y>=window.innerHeight-ROT_ZONE_PAD-ROT_ZONE_H && y<=window.innerHeight-ROT_ZONE_PAD;
+         y>=canvas.height-ROT_ZONE_PAD-ROT_ZONE_H && y<=canvas.height-ROT_ZONE_PAD;
 }
 
-function drawFace(pts,fillColor,strokeColor,lw,dashed){
+function drawFace(pts,fillColor,strokeColor,lw){
   ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
   for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
   ctx.closePath();ctx.fillStyle=fillColor;ctx.fill();
-  ctx.strokeStyle=strokeColor;ctx.lineWidth=lw;
-  if(dashed)ctx.setLineDash([4,3]);
-  ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle=strokeColor;ctx.lineWidth=lw||1.5;ctx.stroke();
 }
 
-function drawHoleFill(projectFn,holesData){
-  ctx.save();ctx.globalCompositeOperation='destination-out';
-  holesData.forEach(function(hole){
-    var holeType=hole.tp;
-    var holeDiameter=hole.d;
-    if(holeType===1){
-      var sl=45,sw=23;
-      var p1=projectFn(hole.x-sl/2,0,hole.z-sw/2),p2=projectFn(hole.x+sl/2,0,hole.z-sw/2);
-      var p3=projectFn(hole.x+sl/2,0,hole.z+sw/2),p4=projectFn(hole.x-sl/2,0,hole.z+sw/2);
-      ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);ctx.closePath();ctx.fill();
-    }else{
-      var r=holeDiameter/2;var segs=24;ctx.beginPath();
-      for(var i=0;i<=segs;i++){var a=(i/segs)*Math.PI*2;var px=hole.x+r*Math.cos(a);var pz=hole.z+r*Math.sin(a);var pr=projectFn(px,0,pz);if(i===0)ctx.moveTo(pr.x,pr.y);else ctx.lineTo(pr.x,pr.y);}
-      ctx.closePath();ctx.fill();
+function sortAndDraw(faces){
+  faces.forEach(function(f){f.z=f.pts.reduce(function(s,p){return s+p.z;},0)/f.pts.length;});
+  faces.sort(function(a,b){return a.z-b.z;});
+  faces.forEach(function(f){drawFace(f.pts,f.c,f.b,f.lw);});
+}
+
+function drawHole(projectFn,hole,offset){
+  var colors=['#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22'];
+  var hc=colors[(offset)%colors.length];
+  if(hole.tp===1){
+    var sl=45,sw=23;
+    var p1=projectFn(hole.x-sl/2,0,hole.z-sw/2);
+    var p2=projectFn(hole.x+sl/2,0,hole.z-sw/2);
+    var p3=projectFn(hole.x+sl/2,0,hole.z+sw/2);
+    var p4=projectFn(hole.x-sl/2,0,hole.z+sw/2);
+    ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);ctx.closePath();
+    ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fill();ctx.strokeStyle=hc;ctx.lineWidth=2.5;ctx.stroke();
+  }else{
+    var r=hole.d/2;var segs=24;
+    var pts=[];
+    for(var i=0;i<=segs;i++){
+      var a=(i/segs)*Math.PI*2;
+      var pr=projectFn(hole.x+r*Math.cos(a),0,hole.z+r*Math.sin(a));
+      if(i===0)ctx.beginPath(),ctx.moveTo(pr.x,pr.y);
+      else ctx.lineTo(pr.x,pr.y);
+      pts.push(pr);
     }
-  });
-  ctx.restore();
-}
-
-function drawHoleStroke(projectFn,holesData,offset){
-  var holeColors=['#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22'];
-  holesData.forEach(function(hole,idx){
-    var hc=holeColors[(idx+offset)%holeColors.length];
-    var holeType=hole.tp;
-    var holeDiameter=hole.d;
-    if(holeType===1){
-      var sl=45,sw=23;
-      var p1=projectFn(hole.x-sl/2,0,hole.z-sw/2),p2=projectFn(hole.x+sl/2,0,hole.z-sw/2);
-      var p3=projectFn(hole.x+sl/2,0,hole.z+sw/2),p4=projectFn(hole.x-sl/2,0,hole.z+sw/2);
-      ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);ctx.closePath();
-      ctx.strokeStyle=hc;ctx.lineWidth=3;ctx.stroke();
-    }else{
-      var r=holeDiameter/2;var segs=24;ctx.beginPath();
-      for(var i=0;i<=segs;i++){var a=(i/segs)*Math.PI*2;var px=hole.x+r*Math.cos(a);var pz=hole.z+r*Math.sin(a);var pr=projectFn(px,0,pz);if(i===0)ctx.moveTo(pr.x,pr.y);else ctx.lineTo(pr.x,pr.y);}
-      ctx.closePath();ctx.strokeStyle=hc;ctx.lineWidth=3;ctx.stroke();
-    }
-  });
-}
-
-function sortFaces(faces,innerFaces){
-  faces.forEach(function(f){f.z=f.pts.reduce(function(s,p){return s+p.z},0)/f.pts.length});
-  innerFaces.forEach(function(f){f.z=f.pts.reduce(function(s,p){return s+p.z},0)/f.pts.length});
-  var all=faces.concat(innerFaces);all.sort(function(a,b){return a.z-b.z});
-  return all;
-}
-
-function draw(){
-  var w=window.innerWidth,h=window.innerHeight;
-  ctx.clearRect(0,0,w,h);
-  // 测试1：画一个红色圆，验证canvas本身工作
-  ctx.beginPath();ctx.arc(w/2,h/2,40,0,Math.PI*2);ctx.fillStyle='#e74c3c';ctx.fill();
-  if(!data)return;
-  try{
-    var viewType=data.t;
-    if(viewType===0)drawRect();
-    else if(viewType===1)drawLShape();
-    else if(viewType===2)drawTrench();
-  }catch(e){
-    ctx.fillStyle='#fff';ctx.font='16px sans-serif';
-    ctx.fillText('DRAW ERROR: '+e.message,20,h/2);
+    ctx.closePath();ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fill();
+    ctx.strokeStyle=hc;ctx.lineWidth=2.5;ctx.stroke();
   }
 }
 
 function drawRect(){
-  var L=data.l,W=data.w,H=data.h,T=data.tk;
+  var L=data.l,W=data.h,H=data.w,T=data.tk; // 注意：3D坐标系 X=长度, Y=高度, Z=宽度
+  var cx=L/2,cy=W/2,cz=H/2; // 这里 W=data.h 是高度，H=data.w 是宽度... 等一下
+  // 实际上原始数据中：l=长度, w=宽度, h=高度
+  // 但在3D引擎里我用 X=长度, Y=高度, Z=宽度
+  // 所以 project(x,y,z) 的 x 对应 data.l, y 对应 data.h, z 对应 data.w
   var maxP=Math.sqrt(L*L+W*W+H*H);
-  function proj(x,y,z){return project(x,y,z,maxP);}
-  var A=proj(0,0,0),B=proj(L,0,0),C=proj(L,H,0),D=proj(0,H,0);
-  var E=proj(0,0,W),F=proj(L,0,W),G=proj(L,H,W),Hp=proj(0,H,W);
-  var faces=[
-    {pts:[A,B,C,D],c:'#3498db',b:'#2980b9'},
-    {pts:[B,F,G,C],c:'#5dade2',b:'#3498db'},
-    {pts:[A,E,F,B],c:'#2980b9',b:'#1a5276'},
-    {pts:[A,D,Hp,E],c:'#5499c7',b:'#2e86c1'},
-    {pts:[E,F,G,Hp],c:'#2e86c1',b:'#1b4f72'}
-  ];
-  var IL=L-2*T,IW=W-2*T,IH=H-T;
-  var innerFaces=[];
-  if(T>0&&IL>0&&IW>0&&IH>0){
-    var I5=proj(T,T,T),I6=proj(L-T,T,T),I7=proj(L-T,T,W-T),I8=proj(T,T,W-T);
-    innerFaces=[{pts:[I5,I6,I7,I8],c:'#85c1e9',b:'#5dade2',d:true}];
-  }
-  sortFaces(faces,innerFaces).forEach(function(f){drawFace(f.pts,f.c,f.b,f.d?1:1.5,f.d);});
+  function proj(x,y,z){return project(x,y,z,cx,cy,cz);}
   
+  // 8个顶点：X方向是长度(0~L), Y方向是高度(0~W), Z方向是宽度(0~H)
+  var v000=proj(0,0,0);var v100=proj(L,0,0);
+  var v110=proj(L,W,0);var v010=proj(0,W,0);
+  var v001=proj(0,0,H);var v101=proj(L,0,H);
+  var v111=proj(L,W,H);var v011=proj(0,W,H);
+  
+  var faces=[
+    {pts:[v000,v100,v110,v010],c:'#3498db',b:'#2980b9',lw:1.5}, // 底面 X-Y
+    {pts:[v100,v101,v111,v110],c:'#5dade2',b:'#3498db',lw:1.5}, // 右侧面 X-Z
+    {pts:[v000,v001,v101,v100],c:'#2980b9',b:'#1a5276',lw:1.5}, // 前面 X-Z... 等等
+  ];
+  
+  // 让我重新定义面，确保方向正确
+  // 面1: 底部 (y=0)
+  var f1={pts:[v000,v100,v101,v001],c:'#3498db',b:'#2980b9',lw:1.5};
+  // 面2: 顶部 (y=W)
+  var f2={pts:[v010,v011,v111,v110],c:'#2e86c1',b:'#1b4f72',lw:1.5};
+  // 面3: 左侧面 (z=0)
+  var f3={pts:[v000,v010,v110,v100],c:'#5dade2',b:'#3498db',lw:1.5};
+  // 面4: 右侧面 (z=H)
+  var f4={pts:[v001,v101,v111,v011],c:'#5499c7',b:'#2e86c1',lw:1.5};
+  // 面5: 前面 (x=0)
+  var f5={pts:[v000,v001,v011,v010],c:'#85c1e9',b:'#5dade2',lw:1.5};
+  // 面6: 后面 (x=L)
+  var f6={pts:[v100,v110,v111,v101],c:'#2980b9',b:'#1a5276',lw:1.5};
+  
+  sortAndDraw([f1,f2,f3,f4,f5,f6]);
+  
+  // 分段线
   if(data.sg&&data.sg.length>1){
     var pos=0;
     for(var i=0;i<data.sg.length-1;i++){
       pos+=data.sg[i];
-      var p1=proj(pos,0,0);
-      var p2=proj(pos,0,W);
-      ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);
-      ctx.strokeStyle='#999';ctx.lineWidth=1;ctx.setLineDash([6,4]);ctx.stroke();ctx.setLineDash([]);
+      var p1=proj(pos,0,0);var p2=proj(pos,W,0);
+      var p3=proj(pos,W,H);var p4=proj(pos,0,H);
+      ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);ctx.closePath();
+      ctx.strokeStyle='rgba(255,255,255,0.4)';ctx.lineWidth=1;ctx.setLineDash([5,4]);ctx.stroke();ctx.setLineDash([]);
     }
   }
   
+  // 孔洞
   if(data.hs&&data.hs.length>0){
-    drawHoleFill(proj,data.hs);
-    drawHoleStroke(proj,data.hs,0);
+    data.hs.forEach(function(h,idx){drawHole(proj,h,idx);});
   }
 }
 
@@ -293,53 +245,72 @@ function drawLShape(){
   var posNames=['top-right','top-left','bottom-right','bottom-left'];
   var pos=posNames[posIndex];
   var TW=LL,TD=LW+SW;
-  var maxP=Math.sqrt(TW*TW+TD*TD+H*H);
-  function proj(x,y,z){return project(x,y,z,maxP);}
+  var cx=TW/2,cy=H/2,cz=TD/2;
+  function proj(x,y,z){return project(x,y,z,cx,cy,cz);}
   var tv,bv;
-  if(pos==='top-right'){tv=[proj(0,H,SW),proj(LL-SL,H,SW),proj(LL-SL,H,0),proj(LL,H,0),proj(LL,H,LW+SW),proj(0,H,LW+SW)];bv=[proj(0,0,SW),proj(LL-SL,0,SW),proj(LL-SL,0,0),proj(LL,0,0),proj(LL,0,LW+SW),proj(0,0,LW+SW)];}
-  else if(pos==='top-left'){tv=[proj(0,H,0),proj(SL,H,0),proj(SL,H,SW),proj(LL,H,SW),proj(LL,H,LW+SW),proj(0,H,LW+SW)];bv=[proj(0,0,0),proj(SL,0,0),proj(SL,0,SW),proj(LL,0,SW),proj(LL,0,LW+SW),proj(0,0,LW+SW)];}
-  else if(pos==='bottom-right'){tv=[proj(0,H,0),proj(LL,H,0),proj(LL,H,LW+SW),proj(LL-SL,H,LW+SW),proj(LL-SL,H,LW),proj(0,H,LW)];bv=[proj(0,0,0),proj(LL,0,0),proj(LL,0,LW+SW),proj(LL-SL,0,LW+SW),proj(LL-SL,0,LW),proj(0,0,LW)];}
-  else{tv=[proj(0,H,0),proj(LL,H,0),proj(LL,H,LW),proj(SL,H,LW),proj(SL,H,LW+SW),proj(0,H,LW+SW)];bv=[proj(0,0,0),proj(LL,0,0),proj(LL,0,LW),proj(SL,0,LW),proj(SL,0,LW+SW),proj(0,0,LW+SW)];}
-  var faces=[{pts:bv,c:'#2980b9',b:'#1a5276'}];
+  if(pos==='top-right'){
+    tv=[proj(0,H,SW),proj(LL-SL,H,SW),proj(LL-SL,H,0),proj(LL,H,0),proj(LL,H,LW+SW),proj(0,H,LW+SW)];
+    bv=[proj(0,0,SW),proj(LL-SL,0,SW),proj(LL-SL,0,0),proj(LL,0,0),proj(LL,0,LW+SW),proj(0,0,LW+SW)];
+  }else if(pos==='top-left'){
+    tv=[proj(0,H,0),proj(SL,H,0),proj(SL,H,SW),proj(LL,H,SW),proj(LL,H,LW+SW),proj(0,H,LW+SW)];
+    bv=[proj(0,0,0),proj(SL,0,0),proj(SL,0,SW),proj(LL,0,SW),proj(LL,0,LW+SW),proj(0,0,LW+SW)];
+  }else if(pos==='bottom-right'){
+    tv=[proj(0,H,0),proj(LL,H,0),proj(LL,H,LW+SW),proj(LL-SL,H,LW+SW),proj(LL-SL,H,LW),proj(0,H,LW)];
+    bv=[proj(0,0,0),proj(LL,0,0),proj(LL,0,LW+SW),proj(LL-SL,0,LW+SW),proj(LL-SL,0,LW),proj(0,0,LW)];
+  }else{
+    tv=[proj(0,H,0),proj(LL,H,0),proj(LL,H,LW),proj(SL,H,LW),proj(SL,H,LW+SW),proj(0,H,LW+SW)];
+    bv=[proj(0,0,0),proj(LL,0,0),proj(LL,0,LW),proj(SL,0,LW),proj(SL,0,LW+SW),proj(0,0,LW+SW)];
+  }
+  var faces=[{pts:bv,c:'#2980b9',b:'#1a5276',lw:2}];
   var sc=['#3498db','#5dade2','#5499c7','#2e86c1','#85c1e9','#5dade2'];
   var sb=['#2980b9','#3498db','#2e86c1','#1b4f72','#5dade2','#3498db'];
-  for(var i=0;i<6;i++){var n=(i+1)%6;faces.push({pts:[tv[i],tv[n],bv[n],bv[i]],c:sc[i],b:sb[i]});}
-  faces.forEach(function(f){f.z=f.pts.reduce(function(s,p){return s+p.z},0)/f.pts.length});
-  faces.sort(function(a,b){return a.z-b.z});
-  faces.forEach(function(f){drawFace(f.pts,f.c,f.b,2,false);});
-  if(data.hs&&data.hs.length>0){
-    drawHoleFill(proj,data.hs);
-    drawHoleStroke(proj,data.hs,0);
-  }
-  if(data.sh&&data.sh.length>0){
-    drawHoleFill(proj,data.sh);
-    drawHoleStroke(proj,data.sh,data.hs?data.hs.length:0);
-  }
+  for(var i=0;i<6;i++){var n=(i+1)%6;faces.push({pts:[tv[i],tv[n],bv[n],bv[i]],c:sc[i],b:sb[i],lw:2});}
+  sortAndDraw(faces);
+  if(data.hs&&data.hs.length>0){data.hs.forEach(function(h,idx){drawHole(proj,h,idx);});}
+  if(data.sh&&data.sh.length>0){data.sh.forEach(function(h,idx){drawHole(proj,h,(data.hs?data.hs.length:0)+idx);});}
 }
 
 function drawTrench(){
   var L=data.l,W=data.w,H=data.h,T=data.tk;
-  var IL=L-2*T,IW=W-2*T,IH=H-T;
-  var hasInner=T>0&&IL>0&&IW>0&&IH>0;
-  var maxP=Math.sqrt(L*L+W*W+H*H);
-  function proj(x,y,z){return project(x,y,z,maxP);}
-  var A=proj(0,0,0),B=proj(L,0,0),C=proj(L,H,0),D=proj(0,H,0);
-  var E=proj(0,0,W),F=proj(L,0,W),G=proj(L,H,W),Hp=proj(0,H,W);
+  var cx=L/2,cy=H/2,cz=W/2;
+  function proj(x,y,z){return project(x,y,z,cx,cy,cz);}
+  var v000=proj(0,0,0);var v100=proj(L,0,0);var v110=proj(L,H,0);var v010=proj(0,H,0);
+  var v001=proj(0,0,W);var v101=proj(L,0,W);var v111=proj(L,H,W);var v011=proj(0,H,W);
   var faces=[
-    {pts:[A,B,C,D],c:'#3498db',b:'#2980b9'},
-    {pts:[B,F,G,C],c:'#5dade2',b:'#3498db'},
-    {pts:[A,E,F,B],c:'#2980b9',b:'#1a5276'},
-    {pts:[A,D,Hp,E],c:'#5499c7',b:'#2e86c1'},
-    {pts:[E,F,G,Hp],c:'#2e86c1',b:'#1b4f72'}
+    {pts:[v000,v100,v110,v010],c:'#3498db',b:'#2980b9',lw:1.5},
+    {pts:[v010,v011,v111,v110],c:'#2e86c1',b:'#1b4f72',lw:1.5},
+    {pts:[v000,v001,v101,v100],c:'#5dade2',b:'#3498db',lw:1.5},
+    {pts:[v001,v011,v111,v101],c:'#5499c7',b:'#2e86c1',lw:1.5},
+    {pts:[v000,v010,v011,v001],c:'#85c1e9',b:'#5dade2',lw:1.5},
+    {pts:[v100,v110,v111,v101],c:'#2980b9',b:'#1a5276',lw:1.5}
   ];
-  var innerFaces=[];
-  if(hasInner){
+  sortAndDraw(faces);
+  var IL=L-2*T,IW=W-2*T,IH=H-T;
+  if(T>0&&IL>0&&IW>0&&IH>0){
     var I5=proj(T,T,T),I6=proj(L-T,T,T),I7=proj(L-T,T,W-T),I8=proj(T,T,W-T);
-    innerFaces=[{pts:[I5,I6,I7,I8],c:'#85c1e9',b:'#5dade2',d:true}];
+    drawFace([I5,I6,I7,I8],'rgba(133,193,233,0.6)','#5dade2',1);
   }
-  sortFaces(faces,innerFaces).forEach(function(f){drawFace(f.pts,f.c,f.b,f.d?1:1.5,f.d);});
 }
 
+function draw(){
+  // 调试：先画一个显眼的黄色方块，验证canvas工作
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#f1c40f';
+  ctx.fillRect(20,80,120,120);
+  
+  if(!data){ctx.fillStyle='#e74c3c';ctx.font='20px sans-serif';ctx.fillText('NO DATA',20,canvas.height-40);return;}
+  
+  try{
+    if(data.t===0)drawRect();
+    else if(data.t===1)drawLShape();
+    else if(data.t===2)drawTrench();
+  }catch(e){
+    ctx.fillStyle='#fff';ctx.font='16px sans-serif';
+    ctx.fillText('DRAW ERROR: '+e.message,20,canvas.height-60);
+  }
+}
+
+// 事件处理
 canvas.addEventListener('mousedown',function(e){
   dragging=true;lastX=e.clientX;lastY=e.clientY;
   dragMode=inRotateZone(e.clientX,e.clientY)?'rotate':'pan';
@@ -347,11 +318,32 @@ canvas.addEventListener('mousedown',function(e){
 canvas.addEventListener('mousemove',function(e){
   if(!dragging)return;
   var dx=e.clientX-lastX,dy=e.clientY-lastY;
-    if(dragMode==='rotate'){
-      flipAngle+=dy*0.015;
-    }else{
-      panX+=dx;panY+=dy;
-    }
+  if(dragMode==='rotate'){flipAngle+=dy*0.015;}else{panX+=dx;panY+=dy;}
+  lastX=e.clientX;lastY=e.clientY;draw();
+});
+canvas.addEventListener('mouseup',function(){dragging=false;});
+canvas.addEventListener('mouseleave',function(){dragging=false;});
+canvas.addEventListener('wheel',function(e){e.preventDefault();zoom*=e.deltaY>0?0.9:1.1;zoom=Math.max(0.05,Math.min(20,zoom));draw();},{passive:false});
+
+canvas.addEventListener('touchstart',function(e){
+  e.preventDefault();
+  if(e.touches.length===1){
+    dragging=true;pinching=false;
+    lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;
+    dragMode=inRotateZone(e.touches[0].clientX,e.touches[0].clientY)?'rotate':'pan';
+  }else if(e.touches.length===2){
+    dragging=false;pinching=true;
+    var dx=e.touches[0].clientX-e.touches[1].clientX;
+    var dy=e.touches[0].clientY-e.touches[1].clientY;
+    lastDist=Math.sqrt(dx*dx+dy*dy);
+  }
+},{passive:false});
+
+canvas.addEventListener('touchmove',function(e){
+  e.preventDefault();
+  if(e.touches.length===1&&dragging){
+    var dx=e.touches[0].clientX-lastX,dy=e.touches[0].clientY-lastY;
+    if(dragMode==='rotate'){flipAngle+=dy*0.015;}else{panX+=dx;panY+=dy;}
     lastX=e.touches[0].clientX;lastY=e.touches[0].clientY;draw();
   }else if(e.touches.length===2&&pinching){
     var dx=e.touches[0].clientX-e.touches[1].clientX;
@@ -366,13 +358,15 @@ canvas.addEventListener('touchend',function(e){
   if(e.touches.length===0)dragging=false;
 },{passive:false});
 
+// 阻止旋转区滚动页面
 var rZone=document.querySelector('.rotate-zone');
 if(rZone){
   rZone.addEventListener('touchstart',function(e){e.preventDefault();e.stopPropagation();},{passive:false});
   rZone.addEventListener('touchmove',function(e){e.preventDefault();e.stopPropagation();},{passive:false});
 }
 
-var infoHtml='<h2>地漏3D视图 <span style=\"color:#e74c3c;font-size:11px;\">测试3号</span></h2>';
+// 信息面板
+var infoHtml='<h2>地漏3D视图 <span style="color:#e74c3c;font-size:11px;">测试4号</span></h2>';
 if(data){
   if(data.pn){infoHtml+='<div>编号：'+data.pn+'</div>';}
   if(data.ps){infoHtml+='<div>面盖款式：'+data.ps+'</div>';}
@@ -382,9 +376,7 @@ if(data){
     infoHtml+='<div>宽度：'+data.w+' mm</div>';
     infoHtml+='<div>高度：'+data.h+' mm</div>';
     infoHtml+='<div>厚度：'+data.tk+' mm</div>';
-    if(data.sg&&data.sg.length>1){
-      infoHtml+='<div>分段：'+data.sg.join('+')+' mm</div>';
-    }
+    if(data.sg&&data.sg.length>1){infoHtml+='<div>分段：'+data.sg.join('+')+' mm</div>';}
   }else if(data.t===1){
     infoHtml+='<div>类型：L型地漏</div>';
     infoHtml+='<div>长边长度：'+data.ll+' mm</div>';
@@ -404,10 +396,7 @@ if(data){
 }
 document.getElementById('info').innerHTML=infoHtml;
 resize();
-if(data){
-  resetTarget();
-  draw();
-}
+
 function tryLockLandscape(){
   try{if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landscape').catch(function(){});}}catch(e){}
 }
