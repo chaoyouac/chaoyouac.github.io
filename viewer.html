@@ -26,7 +26,7 @@ canvas{display:block;width:100vw;height:100vh}
 <canvas id="c"></canvas>
 <button class="reset-btn" onclick="resetView()">重置视角</button>
 <div class="hint">左下角上下拖拽旋转模型 · 其他区域拖拽平移 · 双指缩放</div>
-<div class="version">测试6号</div>
+<div class="version">测试7号</div>
 <div class="info" id="info"></div>
 <div class="rotate-zone">旋转区 ↕</div>
 <script>
@@ -104,10 +104,8 @@ var ROT_ZONE_W=100,ROT_ZONE_H=100,ROT_ZONE_PAD=16;
 var VIEW_TILT=0.25; // 固定轻微倾斜，产生3D感
 
 function resize(){
-  var dpr=window.devicePixelRatio||1;
-  canvas.width=window.innerWidth*dpr;
-  canvas.height=window.innerHeight*dpr;
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
   draw();
 }
 window.addEventListener('resize',resize);
@@ -210,15 +208,15 @@ function drawRect(){
   var v111=proj(L,W,H);var v011=proj(0,W,H);
   
   // 面1: 底部 (y=0) - 保留
-  var f1={pts:[v000,v100,v101,v001],c:'#3498db',b:'#2980b9',lw:1.5};
+  var f1={pts:[v000,v100,v101,v001],c:'#e74c3c',b:'#c0392b',lw:2};
   // 面2: 左侧面 (z=0) - 保留
-  var f3={pts:[v000,v010,v110,v100],c:'#5dade2',b:'#3498db',lw:1.5};
+  var f3={pts:[v000,v010,v110,v100],c:'#2ecc71',b:'#27ae60',lw:2};
   // 面3: 右侧面 (z=H) - 保留
-  var f4={pts:[v001,v101,v111,v011],c:'#5499c7',b:'#2e86c1',lw:1.5};
+  var f4={pts:[v001,v101,v111,v011],c:'#f39c12',b:'#d35400',lw:2};
   // 面4: 前面 (x=0) - 保留
-  var f5={pts:[v000,v001,v011,v010],c:'#85c1e9',b:'#5dade2',lw:1.5};
+  var f5={pts:[v000,v001,v011,v010],c:'#9b59b6',b:'#8e44ad',lw:2};
   // 面5: 后面 (x=L) - 保留
-  var f6={pts:[v100,v110,v111,v101],c:'#2980b9',b:'#1a5276',lw:1.5};
+  var f6={pts:[v100,v110,v111,v101],c:'#1abc9c',b:'#16a085',lw:2};
   // 注意：去掉了顶部面 (y=W)，因为地漏是开口/中空的，不需要顶面
   
   sortAndDraw([f1,f3,f4,f5,f6]);
@@ -237,10 +235,10 @@ function drawRect(){
     ctx.restore();
   }
   
-  // 孔洞
-  if(data.hs&&data.hs.length>0){
-    data.hs.forEach(function(h,idx){drawHole(proj,h,idx);});
-  }
+  // 孔洞（临时禁用排查线条问题）
+  // if(data.hs&&data.hs.length>0){
+  //   data.hs.forEach(function(h,idx){drawHole(proj,h,idx);});
+  // }
 }
 
 function drawLShape(){
@@ -297,7 +295,10 @@ function drawTrench(){
 }
 
 function draw(){
+  ctx.save();
+  ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.restore();
   if(!data)return;
   try{
     if(data.t===0)drawRect();
@@ -305,7 +306,7 @@ function draw(){
     else if(data.t===2)drawTrench();
   }catch(e){
     ctx.fillStyle='#fff';ctx.font='16px sans-serif';
-    ctx.fillText('DRAW ERROR: '+e.message,20,canvas.height-60);
+    ctx.fillText('DRAW ERROR: '+e.message,20,window.innerHeight-60);
   }
 }
 
@@ -365,7 +366,7 @@ if(rZone){
 }
 
 // 信息面板
-var infoHtml='<h2>地漏3D视图 <span style=\"color:#e74c3c;font-size:11px;\">测试6号</span></h2>';
+var infoHtml='<h2>地漏3D视图 <span style=\"color:#e74c3c;font-size:11px;\">测试7号</span></h2>';
 if(data){
   if(data.pn){infoHtml+='<div>编号：'+data.pn+'</div>';}
   if(data.ps){infoHtml+='<div>面盖款式：'+data.ps+'</div>';}
