@@ -26,7 +26,7 @@ canvas{display:block;width:100vw;height:100vh}
 <canvas id="c"></canvas>
 <button class="reset-btn" onclick="resetView()">重置视角</button>
 <div class="hint">左下角上下拖拽旋转模型 · 其他区域拖拽平移 · 双指缩放</div>
-<div class="version">测试7号</div>
+<div class="version">测试8号</div>
 <div class="info" id="info"></div>
 <div class="rotate-zone">旋转区 ↕</div>
 <script>
@@ -104,8 +104,10 @@ var ROT_ZONE_W=100,ROT_ZONE_H=100,ROT_ZONE_PAD=16;
 var VIEW_TILT=0.25; // 固定轻微倾斜，产生3D感
 
 function resize(){
-  canvas.width=window.innerWidth;
-  canvas.height=window.innerHeight;
+  var dpr=window.devicePixelRatio||1;
+  canvas.width=window.innerWidth*dpr;
+  canvas.height=window.innerHeight*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
   draw();
 }
 window.addEventListener('resize',resize);
@@ -163,33 +165,38 @@ function sortAndDraw(faces){
 function drawHole(projectFn,hole,offset){
   var colors=['#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22'];
   var hc=colors[(offset)%colors.length];
-  ctx.save();
   if(hole.tp===1){
     var sl=45,sw=23;
     var p1=projectFn(hole.x-sl/2,0,hole.z-sw/2);
     var p2=projectFn(hole.x+sl/2,0,hole.z-sw/2);
     var p3=projectFn(hole.x+sl/2,0,hole.z+sw/2);
     var p4=projectFn(hole.x-sl/2,0,hole.z+sw/2);
+    ctx.save();
     ctx.beginPath();
     ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.lineTo(p3.x,p3.y);ctx.lineTo(p4.x,p4.y);
     ctx.closePath();
     ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fill();
     ctx.strokeStyle=hc;ctx.lineWidth=2.5;ctx.stroke();
+    ctx.restore();
   }else{
     var r=hole.d/2;var segs=24;
+    ctx.save();
     ctx.beginPath();
+    ctx.moveTo(0,0); // 先moveTo一个点，确保path开始
+    var firstPt=null;
     for(var i=0;i<=segs;i++){
       var a=(i/segs)*Math.PI*2;
       var hx=hole.x+r*Math.cos(a);
       var hz=hole.z+r*Math.sin(a);
       var pt=projectFn(hx,0,hz);
-      if(i===0){ctx.moveTo(pt.x,pt.y);}else{ctx.lineTo(pt.x,pt.y);}
+      if(i===0){ctx.moveTo(pt.x,pt.y);firstPt=pt;}else{ctx.lineTo(pt.x,pt.y);}
     }
+    if(firstPt){ctx.lineTo(firstPt.x,firstPt.y);}
     ctx.closePath();
     ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fill();
     ctx.strokeStyle=hc;ctx.lineWidth=2.5;ctx.stroke();
+    ctx.restore();
   }
-  ctx.restore();
 }
 
 function drawRect(){
@@ -207,17 +214,17 @@ function drawRect(){
   var v001=proj(0,0,H);var v101=proj(L,0,H);
   var v111=proj(L,W,H);var v011=proj(0,W,H);
   
-  // 面1: 底部 (y=0) - 保留
-  var f1={pts:[v000,v100,v101,v001],c:'#e74c3c',b:'#c0392b',lw:2};
-  // 面2: 左侧面 (z=0) - 保留
-  var f3={pts:[v000,v010,v110,v100],c:'#2ecc71',b:'#27ae60',lw:2};
-  // 面3: 右侧面 (z=H) - 保留
-  var f4={pts:[v001,v101,v111,v011],c:'#f39c12',b:'#d35400',lw:2};
-  // 面4: 前面 (x=0) - 保留
-  var f5={pts:[v000,v001,v011,v010],c:'#9b59b6',b:'#8e44ad',lw:2};
-  // 面5: 后面 (x=L) - 保留
-  var f6={pts:[v100,v110,v111,v101],c:'#1abc9c',b:'#16a085',lw:2};
-  // 注意：去掉了顶部面 (y=W)，因为地漏是开口/中空的，不需要顶面
+  // 面1: 底部 (y=0)
+  var f1={pts:[v000,v100,v101,v001],c:'#3498db',b:'#2980b9',lw:1.5};
+  // 面2: 左侧面 (z=0)
+  var f3={pts:[v000,v010,v110,v100],c:'#5dade2',b:'#3498db',lw:1.5};
+  // 面3: 右侧面 (z=H)
+  var f4={pts:[v001,v101,v111,v011],c:'#5499c7',b:'#2e86c1',lw:1.5};
+  // 面4: 前面 (x=0)
+  var f5={pts:[v000,v001,v011,v010],c:'#85c1e9',b:'#5dade2',lw:1.5};
+  // 面5: 后面 (x=L)
+  var f6={pts:[v100,v110,v111,v101],c:'#2980b9',b:'#1a5276',lw:1.5};
+  // 注意：去掉了顶部面 (y=W)
   
   sortAndDraw([f1,f3,f4,f5,f6]);
   
@@ -235,10 +242,10 @@ function drawRect(){
     ctx.restore();
   }
   
-  // 孔洞（临时禁用排查线条问题）
-  // if(data.hs&&data.hs.length>0){
-  //   data.hs.forEach(function(h,idx){drawHole(proj,h,idx);});
-  // }
+  // 孔洞
+  if(data.hs&&data.hs.length>0){
+    data.hs.forEach(function(h,idx){drawHole(proj,h,idx);});
+  }
 }
 
 function drawLShape(){
@@ -366,7 +373,7 @@ if(rZone){
 }
 
 // 信息面板
-var infoHtml='<h2>地漏3D视图 <span style=\"color:#e74c3c;font-size:11px;\">测试7号</span></h2>';
+var infoHtml='<h2>地漏3D视图 <span style=\"color:#e74c3c;font-size:11px;\">测试8号</span></h2>';
 if(data){
   if(data.pn){infoHtml+='<div>编号：'+data.pn+'</div>';}
   if(data.ps){infoHtml+='<div>面盖款式：'+data.ps+'</div>';}
